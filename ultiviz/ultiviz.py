@@ -14,6 +14,7 @@ from .pose import PoseMixin
 from .segmentation import SegmentationMixin
 from .tracking import TrackingMixin
 from .video import VideoMixin
+from .timing import TimingMixin
 
 
 def _is_result(value):
@@ -42,7 +43,7 @@ class _VisualizerType(type):
 
 class Visualizer(
     ColorMixin, DrawingMixin, DetectionMixin, SegmentationMixin, PoseMixin, ChartMixin,
-    TrackingMixin, InferenceMixin, VideoMixin, metaclass=_VisualizerType,
+    TrackingMixin, InferenceMixin, VideoMixin, TimingMixin, metaclass=_VisualizerType,
 ):
     """Render detection, segmentation, pose, OBB, classification and tracks.
 
@@ -70,7 +71,12 @@ class Visualizer(
         font_scale=0.7, text_thickness=1, padding=7,
         keypoint_confidence=0.25, keypoint_radius=4, skeleton=None,
         trail_length=45, trail_max_gap=30, ignored_semantic_ids=(255,),
+        timing=True, on_timing=None,
     ):
+        if on_timing is not None and not callable(on_timing):
+            raise ValueError("on_timing must be callable")
+        self.timing = bool(timing)
+        self.on_timing = on_timing
         for name, value in (
             ("image_size", image_size), ("line_width", line_width),
             ("text_thickness", text_thickness), ("keypoint_radius", keypoint_radius),
@@ -177,6 +183,9 @@ class Visualizer(
         for an explicit image. copy=False draws in place on a writable,
         C-contiguous frame. Call once per frame, in sequence, for trails.
         """
+        return self._render_timed(frame, result, copy=copy)
+
+    def _annotate_frame(self, frame, result=None, *, copy=True):
         if result is None:
             result = frame
             frame = getattr(result, "orig_img", None)

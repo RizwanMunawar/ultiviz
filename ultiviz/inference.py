@@ -1,6 +1,7 @@
 """Lazy optional Ultralytics inference and tracking integration."""
 
 from pathlib import Path
+from time import perf_counter
 
 
 class InferenceMixin:
@@ -39,8 +40,10 @@ class InferenceMixin:
                           classes=None if self.class_ids is None else sorted(self.class_ids))
         if task == "segment":
             kwargs["retina_masks"] = True
+        start = perf_counter() if self.timing else None
         if self.tracking:
             result = model.track(frame, persist=True, tracker=self.tracker, **kwargs)[0]
         else:
             result = model.predict(frame, **kwargs)[0]
-        return self.annotate(frame, result, copy=copy)
+        model_call_ms = (perf_counter() - start) * 1000 if start is not None else None
+        return self._render_timed(frame, result, copy=copy, model_call_ms=model_call_ms)

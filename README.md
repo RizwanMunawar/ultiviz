@@ -127,10 +127,49 @@ results containing tracker IDs once per frame, in order. Call `reset()` between
 sequences; `run()` resets visualization state and model trackers automatically.
 Charts show current-frame counts or visible semantic-class pixel percentages.
 
+## Per-frame speed
+
+Timing is reported automatically for each rendered frame, for images and videos:
+
+```text
+Frame 1 | inference: 5.20 ms | visualization: 1.40 ms | processing: 6.60 ms
+```
+
+These are example values, not a speed guarantee. Inference, preprocessing, and
+postprocessing metrics come from Ultralytics `result.speed`. Visualization time
+is measured around frame copying and drawing only. `processing` adds inference
+and visualization; it excludes preprocessing, postprocessing, saving, preview,
+and console output. Missing inference metrics show `n/a`, never a fabricated zero.
+When using `process_frame()`, `model call` additionally measures host wall time
+around the model call (including its preprocessing/postprocessing and overhead).
+It is separate from backend inference time and adds no extra GPU synchronization.
+
+The existing one-call usage stays the same:
+
+```python
+output = Visualizer(results)
+```
+
+Use `timing=False` to disable timing work and console output. To consume metrics
+without per-frame console writes, pass a callback instead:
+
+```python
+def report_speed(record):
+    print(record.frame_index, record.inference_ms, record.visualization_ms)
+
+output = Visualizer(results, on_timing=report_speed)
+```
+
+A reusable `Visualizer()` also exposes `last_timing`, a `FrameTiming` record with
+`frame_index`, `inference_ms`, `visualization_ms`, `processing_ms`,
+`preprocess_ms`, `postprocess_ms`, and `model_call_ms`. Only the latest record is
+retained; `reset()` clears it. Callbacks run synchronously, so keep them short.
+
 ## Keep visualization fast
 
 `Visualizer(results)` immediately saves and displays the predictions. For a
-headless export, set `show=False` to skip preview work. Prefer `stream=True` for
+headless export, set `show=False` to skip preview work. Use `timing=False`
+when console reporting is unnecessary. Prefer `stream=True` for
 long videos to keep memory use bounded.
 
 For pure rendering without saving or display, use
@@ -176,3 +215,8 @@ python3 -m twine check dist/*
 CI tests macOS, Linux, and Windows, including installed-package and wheel checks.
 Tests use synthetic data without downloading weights, accessing cameras, or
 opening preview windows.
+
+## License
+
+Licensed under the GNU Affero General Public License version 3.0
+(`AGPL-3.0-only`). See [LICENSE](LICENSE) for the complete license text.

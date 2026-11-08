@@ -115,6 +115,7 @@ class VideoMixin:
         writer = None
         last_frame = None
         self.reset()
+        checked_source = object()
         try:
             output_path = Path(output)
             if save and output_path.suffix.lower() != ".mp4":
@@ -123,8 +124,10 @@ class VideoMixin:
                 raise ValueError("fps must be finite and positive")
             for result in iterator:
                 source = getattr(result, "path", None)
-                if save:
+                source_key = str(source) if isinstance(source, (str, Path)) else None
+                if save and source_key != checked_source:
                     self._check_output(output_path, source)
+                    checked_source = source_key
                 frame = self.annotate(result, copy=copy)
                 size = (frame.shape[1], frame.shape[0])
                 if last_frame is None:
@@ -141,7 +144,7 @@ class VideoMixin:
                 if writer is not None:
                     writer.write(frame)
                 last_frame = frame
-                if show and self._preview(frame, max(1, round(1000 / rate))):
+                if show and self._preview(frame, 1):
                     break
             if last_frame is None:
                 raise ValueError("No prediction results to visualize")
