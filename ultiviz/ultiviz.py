@@ -41,6 +41,17 @@ class Visualizer(
         trail_length=45, trail_max_gap=30, ignored_semantic_ids=(255,),
     ):
         for name, value in (
+            ("image_size", image_size), ("line_width", line_width),
+            ("text_thickness", text_thickness), ("keypoint_radius", keypoint_radius),
+            ("trail_length", trail_length), ("corner_radius", corner_radius),
+            ("boundary_thickness", boundary_thickness), ("padding", padding),
+            ("trail_max_gap", trail_max_gap),
+        ):
+            if isinstance(value, bool) or not isinstance(value, (int, np.integer)):
+                raise ValueError(f"{name} must be an integer")
+        if image_size < 1:
+            raise ValueError("image_size must be positive")
+        for name, value in (
             ("confidence", confidence), ("iou", iou),
             ("mask_opacity", mask_opacity), ("label_opacity", label_opacity),
             ("keypoint_confidence", keypoint_confidence),
@@ -49,12 +60,13 @@ class Visualizer(
                 raise ValueError(f"{name} must be between 0 and 1")
         if min(line_width, text_thickness, keypoint_radius, trail_length) < 1:
             raise ValueError("Drawing widths, point radius and trail length must be positive")
-        if min(corner_radius, boundary_thickness, padding, trail_max_gap) < 0 or font_scale <= 0:
+        if (min(corner_radius, boundary_thickness, padding, trail_max_gap) < 0
+                or not np.isfinite(font_scale) or font_scale <= 0):
             raise ValueError("Drawing sizes must be nonnegative; font_scale must be positive")
         self.model = model
         self._model_path = (Path(model) if isinstance(model, (str, Path))
                             else getattr(model, "ckpt_path", None))
-        self.tracking, self.tracker = tracking, tracker
+        self.tracking, self.tracker = tracking or show_trails, tracker
         self.confidence, self.iou = confidence, iou
         self.image_size, self.device = image_size, device
         self.class_ids = None if class_ids is None else set(class_ids)
@@ -94,15 +106,34 @@ class Visualizer(
                 and self.normalize_name(name) not in self.hidden_classes
                 and track_id not in self.hidden_track_ids)
 
-    def annotate(self, frame, result):
+    @staticmethod
+    def _validate_frame(frame):
+        if (not isinstance(frame, np.ndarray) or frame.ndim != 3
+                or frame.shape[2] != 3 or frame.dtype != np.uint8
+                or min(frame.shape[:2]) == 0):
+            raise ValueError("Expected a nonempty uint8 BGR frame with shape (H, W, 3)")
+
+    def __call__(self, result, *, copy=True):
+        """Visualize one Ultralytics Results object using its original image."""
+        return self.annotate(result, copy=copy)
+
+    def annotate(self, frame, result=None, *, copy=True):
         """Auto-detect result type and return an annotated copy of a BGR frame.
 
-        Call once per frame, in sequence, when using trails. Results must
-        correspond to this frame at its original resolution.
+        Pass a Results object alone to use result.orig_img, or (frame, result)
+        for an explicit image. copy=False draws in place on a writable,
+        C-contiguous frame. Call once per frame, in sequence, for trails.
         """
-        if frame.ndim != 3 or frame.shape[2] != 3 or frame.dtype != np.uint8:
-            raise ValueError("Expected a uint8 BGR frame with shape (H, W, 3)")
-        annotated = frame.copy()
+        if result is None:
+            result = frame
+            frame = getattr(result, "orig_img", None)
+        self._validate_frame(frame)
+        original_shape = getattr(result, "orig_shape", None)
+        if original_shape is not None and tuple(original_shape) != frame.shape[:2]:
+            raise ValueError("Frame dimensions must match the result's original image")
+        if not copy and (not frame.flags.writeable or not frame.flags.c_contiguous):
+            raise ValueError("copy=False requires a writable C-contiguous frame")
+        annotated = frame.copy() if copy else frame
         self._advance_tracks()
         raw_names = result.names
         names = dict(raw_names) if isinstance(raw_names, dict) else dict(enumerate(raw_names))
@@ -113,9 +144,10 @@ class Visualizer(
         counts = self._annotate_detections(frame, annotated, result, names)
         probs = getattr(result, "probs", None)
         if probs is not None and self.show_labels:
-            for rank, cls in enumerate(probs.top5):
+            probabilities = self._numpy(probs.data)
+            for rank, cls in enumerate(np.argsort(-probabilities)[:5]):
                 name = names.get(cls, str(cls))
-                self.draw_label(annotated, f"{name} {float(probs.data[cls]):.2f}",
+                self.draw_label(annotated, f"{name} {float(probabilities[cls]):.2f}",
                                 (8, 8 + rank * 42), self.color(cls, name), above=False)
         elif self.show_chart:
             self.draw_chart(annotated, counts, names)

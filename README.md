@@ -25,13 +25,15 @@ from ultralytics import YOLO
 from ultiviz import Visualizer
 
 result = YOLO("model.pt").predict("image.jpg", retina_masks=True)[0]
-annotated = Visualizer().annotate(result.orig_img, result)
+visualizer = Visualizer()
+annotated = visualizer(result)
 cv2.imwrite("annotated.jpg", annotated)
 ```
 
 Use detection weights for bounding boxes, segmentation weights for masks, pose
-weights for skeletons, or OBB weights for rotated boxes. `annotate()` selects the
-renderer automatically and returns an annotated copy, leaving the input intact.
+weights for skeletons, or OBB weights for rotated boxes. `visualizer(result)`
+selects the renderer automatically and returns an annotated copy, leaving the input intact.
+`visualizer.annotate(frame, result)` also works with an explicit image.
 `retina_masks=True` keeps instance masks at the original image resolution.
 
 ## Visualize a video
@@ -42,10 +44,10 @@ from ultiviz import Visualizer
 Visualizer("model.pt").run("input.mp4", "output.mp4", show_window=False)
 ```
 
-Enable tracking and trails with two options:
+Enable tracking trails with one option:
 
 ```python
-Visualizer("model.pt", tracking=True, show_trails=True).run(
+Visualizer("model.pt", show_trails=True).run(
     "input.mp4", "tracked.mp4", show_window=False,
 )
 ```
@@ -63,7 +65,7 @@ visualizer = Visualizer(
     mask_opacity=0.5,
     class_colors={0: (0, 255, 0)},  # BGR colors
 )
-annotated = visualizer.annotate(result.orig_img, result)
+annotated = visualizer(result)
 ```
 
 Other options include `show_labels`, `show_masks`, `show_pose`, `show_centers`,
@@ -91,6 +93,26 @@ When annotating existing tracked results, enable `show_trails=True` and supply
 results containing tracker IDs once per frame, in order. Call `reset()` between
 sequences; `run()` resets visualization state and model trackers automatically.
 Charts show current-frame counts or visible semantic-class pixel percentages.
+
+## Keep visualization fast
+
+Create one `Visualizer` and reuse it across frames. For an existing YOLO loop,
+pass each prediction directly without running inference twice:
+
+```python
+visualizer = Visualizer()
+for result in model.predict("input.mp4", stream=True, retina_masks=True):
+    annotated = visualizer(result)
+    # Display, save, or pass annotated to your application here.
+```
+
+Use `visualizer(result, copy=False)` or `process_frame(frame, copy=False)` to
+avoid copying the input image when you can modify it in place. In-place drawing
+requires a writable, C-contiguous BGR image. The default preserves your input.
+Mask overlays retain cropped regions, and rounded geometry uses vectorized
+calculations. Disable optional features such as charts and trails when unused.
+For `run()`, `show_window=False` avoids preview work. Model inference speed
+still depends on your weights, device, and `image_size` (default: 1280).
 
 ## Command line
 

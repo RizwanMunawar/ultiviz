@@ -35,6 +35,7 @@ class VideoMixin:
             success, frame = cap.read()
             if not success:
                 raise RuntimeError(f"Cannot read video source: {source}")
+            self._validate_frame(frame)
             height, width = frame.shape[:2]
             fps = cap.get(cv2.CAP_PROP_FPS)
             if not np.isfinite(fps) or fps <= 0:
@@ -45,6 +46,8 @@ class VideoMixin:
                 if not writer.isOpened():
                     raise RuntimeError(f"Cannot create output video: {output_path}")
             while success:
+                if frame.shape != (height, width, 3):
+                    raise ValueError("Video frame dimensions changed during capture")
                 annotated = self.process_frame(frame)
                 if writer is not None:
                     writer.write(annotated)

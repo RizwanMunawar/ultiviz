@@ -14,6 +14,9 @@ class DetectionMixin:
         boxes = obb if obb is not None else getattr(result, "boxes", None)
         counts = Counter()
         if boxes is not None and len(boxes):
+            # Transfer detection metadata together, avoiding repeated device syncs.
+            if hasattr(boxes, "cpu"):
+                boxes = boxes.cpu()
             classes = self._numpy(boxes.cls).astype(int)
             confidences = self._numpy(boxes.conf)
             ids = self._numpy(boxes.id).astype(int) if boxes.id is not None else [None] * len(boxes)
@@ -21,18 +24,21 @@ class DetectionMixin:
             selected = [i for i, cls in enumerate(classes)
                         if self._visible(int(cls), names.get(int(cls), str(cls)), ids[i])]
             masks = getattr(result, "masks", None)
-            if self.show_masks and masks is not None:
+            if selected and self.show_masks and masks is not None:
                 if len(masks) != len(boxes):
                     raise ValueError("Expected one mask per detected object")
                 data = self._numpy(masks.data)
                 selected_masks = []
+                polygons = None
                 for i in selected:
                     if data[i].shape == frame.shape[:2]:
                         selected_masks.append(data[i])
                     else:
                         # masks.xy already accounts for inference letterboxing.
                         binary = np.zeros(frame.shape[:2], dtype=np.uint8)
-                        polygon = np.asarray(masks.xy[i], dtype=np.int32).reshape(-1, 1, 2)
+                        if polygons is None:
+                            polygons = masks.xy
+                        polygon = np.asarray(polygons[i], dtype=np.int32).reshape(-1, 1, 2)
                         if len(polygon) >= 3:
                             cv2.fillPoly(binary, [polygon], 1)
                         selected_masks.append(binary)
