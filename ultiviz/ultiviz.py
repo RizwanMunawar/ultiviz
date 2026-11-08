@@ -15,6 +15,7 @@ from .segmentation import SegmentationMixin
 from .tracking import TrackingMixin
 from .video import VideoMixin
 from .timing import TimingMixin
+from .depth import DepthMixin
 
 
 def _is_result(value):
@@ -43,9 +44,9 @@ class _VisualizerType(type):
 
 class Visualizer(
     ColorMixin, DrawingMixin, DetectionMixin, SegmentationMixin, PoseMixin, ChartMixin,
-    TrackingMixin, InferenceMixin, VideoMixin, TimingMixin, metaclass=_VisualizerType,
+    TrackingMixin, InferenceMixin, VideoMixin, TimingMixin, DepthMixin, metaclass=_VisualizerType,
 ):
-    """Render detection, segmentation, pose, OBB, classification and tracks.
+    """Render detection, segmentation, pose, OBB, depth, classification and tracks.
 
     Visualizer(results) directly renders a prediction or prediction list;
     annotations are saved and displayed immediately. Images return annotated
@@ -72,6 +73,7 @@ class Visualizer(
         keypoint_confidence=0.25, keypoint_radius=4, skeleton=None,
         trail_length=45, trail_max_gap=30, ignored_semantic_ids=(255,),
         timing=True, on_timing=None,
+        show_depth=True,
     ):
         if on_timing is not None and not callable(on_timing):
             raise ValueError("on_timing must be callable")
@@ -113,6 +115,7 @@ class Visualizer(
         self.show_boxes, self.show_labels = show_boxes, show_labels
         self.show_confidence, self.show_ids = show_confidence, show_ids
         self.show_masks, self.show_pose = show_masks, show_pose
+        self.show_depth = show_depth
         self.show_trails, self.show_centers = show_trails, show_centers
         self.show_chart = show_chart
         self.mask_opacity, self.label_opacity = mask_opacity, label_opacity
@@ -197,6 +200,9 @@ class Visualizer(
             raise ValueError("copy=False requires a writable C-contiguous frame")
         annotated = frame.copy() if copy else frame
         self._advance_tracks()
+        depth = getattr(result, "depth", None)
+        if depth is not None:
+            return self._annotate_depth(annotated, depth)
         raw_names = result.names
         names = dict(raw_names) if isinstance(raw_names, dict) else dict(enumerate(raw_names))
         semantic = getattr(result, "semantic_mask", None)

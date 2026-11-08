@@ -2,7 +2,7 @@
 
 Simple visualization utilities for **Ultralytics YOLO results**: bounding boxes,
 segmentation masks, pose keypoints and skeletons, oriented bounding boxes (OBB),
-classification labels, and tracking trails. Visualize existing predictions or
+classification labels, depth heatmaps, and tracking trails. Visualize existing predictions or
 pass a model to process a video in one call.
 
 ## Install
@@ -17,77 +17,153 @@ For drawing only, `python3 -m pip install -e .` installs NumPy and OpenCV withou
 Ultralytics. Model weights and input media are supplied by you; replace the
 example paths below with your own.
 
-## Visualize an image
+## Task examples
+
+All seven examples use the same `output = Visualizer(results)` call. Images are
+saved to `annotated.jpg`; videos are saved to `annotated.mp4`. Both are displayed
+automatically, and per-frame inference/visualization times are reported.
+Image previews close on any key; video previews stop on Q or Escape. Use
+`Visualizer(results, show=False)` when no desktop display is available.
+
+Replace source paths with your own files. Ultralytics downloads the selected
+pretrained weights on first use if they are not already available locally.
+Semantic segmentation and depth require an Ultralytics version supporting these
+YOLO26 tasks (examples verified with version 8.4.190).
+
+### 1. Object detection — `yolo26n.pt`
+
+Draw bounding boxes and class labels:
 
 ```python
 from ultralytics import YOLO
 from ultraviz import Visualizer
 
-model = YOLO("model.pt")
+model = YOLO("yolo26n.pt")
+results = model.predict(source="path/to/image.jpg")
+output = Visualizer(results)
+```
+
+### 2. Instance segmentation — `yolo26n-seg.pt`
+
+Draw separate masks for individual objects. `retina_masks=True` keeps masks at
+the original image resolution:
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n-seg.pt")
 results = model.predict(source="path/to/image.jpg", retina_masks=True)
 output = Visualizer(results)
 ```
 
-Both `from ultraviz import Visualizer` and `from ultiviz import Visualizer`
-work; the distribution and command-line name remain `ultiviz`.
-This call saves `annotated.jpg`, displays it, and returns the annotated BGR
-image array. Press any key to close the image preview.
+For masks without boxes, use `Visualizer(results, show_boxes=False)`.
 
-Use detection weights for bounding boxes, segmentation weights for masks, pose
-weights for skeletons, or OBB weights for rotated boxes. The renderer selects the
-right visualization automatically. `retina_masks=True` keeps instance masks at
-the original image resolution. Drawing preserves the input image by default.
+### 3. Pose estimation — `yolo26n-pose.pt`
 
-`Visualizer(results)` saves and displays predictions immediately. The same call
-works with image and video sources; no frame loop, `cv2.imwrite`, or video writer
-is needed in your code. Existing output files with the selected names are
-replaced; input files are protected from being overwritten.
-
-## Visualize a video stream
+Draw person keypoints and skeletons:
 
 ```python
 from ultralytics import YOLO
 from ultraviz import Visualizer
 
-model = YOLO("model.pt")
-results = model.predict(source="path/to/video.mp4", stream=True, retina_masks=True)
+model = YOLO("yolo26n-pose.pt")
+results = model.predict(source="path/to/image.jpg")
 output = Visualizer(results)
 ```
 
-The call consumes the prediction stream immediately, saves `annotated.mp4`,
-and displays the video. `output` is the last annotated frame as a BGR image
-array, matching the image return format. The saved file contains all processed
-frames without audio. Press Q or Escape to stop early; the partial video is
-finalized and resources are released.
+### 4. Oriented bounding boxes — `yolo26n-obb.pt`
 
-Frames are processed one at a time without repeating inference or storing the
-whole video in memory. Video prediction lists also work; `stream=True` is
-recommended for long videos. Source FPS is read from local video metadata or
-falls back to 30 FPS.
+Draw rotated boxes for objects such as those in aerial imagery:
 
-Optional settings use the same call:
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n-obb.pt")
+results = model.predict(source="path/to/image.jpg")
+output = Visualizer(results)
+```
+
+### 5. Semantic segmentation — `yolo26n-sem.pt`
+
+Color pixels by class using the predicted `semantic_mask`:
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n-sem.pt")
+results = model.predict(source="path/to/image.jpg")
+output = Visualizer(results)
+```
+
+### 6. Depth estimation — `yolo26n-depth.pt`
+
+Blend a depth heatmap with the source image:
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n-depth.pt")
+results = model.predict(source="path/to/image.jpg")
+output = Visualizer(results)
+```
+
+Colors are normalized separately for each frame and are for visualization, not
+cross-frame distance comparisons. Invalid depth pixels remain unchanged. Read
+`results[0].depth.data` for the model's original depth values. Use `show_depth=False`
+to hide the heatmap or `mask_opacity=1.0` for a fully colored map.
+
+### 7. Tracking and video streams — `yolo26n.pt`
+
+Track objects across frames, draw IDs and trails, save the video, and display
+playback without writing a frame loop:
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n.pt")
+results = model.track(source="path/to/video.mp4", stream=True, tracker="bytetrack.yaml")
+output = Visualizer(results, show_trails=True)
+```
+
+For video inference without tracking, replace `model.track(...)` with
+`model.predict(source="path/to/video.mp4", stream=True)`. The same video pattern
+works with the task models above; only detection, instance segmentation, pose,
+and OBB support tracking.
+
+For model names and task details, see the official
+[YOLO26 overview](https://docs.ultralytics.com/models/yolo26/),
+[semantic segmentation guide](https://docs.ultralytics.com/tasks/semantic/), and
+[depth estimation guide](https://docs.ultralytics.com/tasks/depth/).
+
+## Outputs and options
+
+`output` is an annotated BGR image array for one image or the last processed
+frame for a video. The saved video contains all processed frames without audio.
+Image batches return a list of arrays and save additional images as
+`annotated_2.jpg`, `annotated_3.jpg`, and so on. Streamed images return the last
+annotated image. Video processing retains only the current frames in memory;
+use `stream=True` for long inputs.
+
+Both `from ultraviz import Visualizer` and `from ultiviz import Visualizer` work;
+the distribution and command-line name remain `ultiviz`. Existing output files
+with the selected names are replaced; input files are protected from overwrite.
+
+Optional output settings keep the same call:
 
 ```python
 output = Visualizer(results, output="custom.mp4", fps=25, show=False)
 ```
 
-Use a fresh prediction stream for each call. `show=False` saves without opening
-a window and is required for servers, headless OpenCV, or environments without
-a desktop display. Use `save=False` to display without saving. Image output paths
-can use `.jpg`, `.png`, or another supported image extension; video output uses
-`.mp4`. The default image filename is `annotated.jpg`, and batch images use
-`annotated_2.jpg`, `annotated_3.jpg`, and so on. Image batches return a list of
-annotated arrays; streamed images return the last annotated image.
-
-For tracking trails, use tracked predictions:
-
-```python
-results = model.track(source="path/to/video.mp4", stream=True, retina_masks=True)
-output = Visualizer(results, show_trails=True)
-```
-
-For video inference managed entirely by ultiviz, you can also use
-`Visualizer("model.pt").run("input.mp4", "output.mp4", show_window=False)`.
+Use a fresh prediction stream for each call. `show=False` saves without a preview;
+`save=False` displays without saving. Use an image extension such as `.jpg` or
+`.png` for image output and `.mp4` for video output. Video FPS is read from local
+source metadata or defaults to 30; `fps=` overrides it. For inference managed by
+ultiviz, use `Visualizer("yolo26n.pt").run("input.mp4", "output.mp4", show_window=False)`.
 
 ## Customize the visualization
 
@@ -102,7 +178,7 @@ annotated = visualizer(results)
 ```
 
 Other options include `show_labels`, `show_masks`, `show_pose`, `show_centers`,
-`show_chart`, `class_ids`, `hidden_classes`, `hidden_track_ids`, and `line_width`.
+`show_chart`, `show_depth`, `class_ids`, `hidden_classes`, `hidden_track_ids`, and `line_width`.
 For custom poses, pass zero-based skeleton edges such as `skeleton=[(0, 1)]`;
 17-keypoint poses use the COCO skeleton automatically.
 

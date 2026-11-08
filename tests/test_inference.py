@@ -72,6 +72,14 @@ class InferenceTests(unittest.TestCase):
         model.predict.assert_not_called()
         model.track.assert_not_called()
 
+    def test_dense_prediction_tasks_omit_detection_only_options(self):
+        for task in ("semantic", "depth"):
+            with self.subTest(task=task):
+                model = self.model(task)
+                Visualizer(model, timing=False).process_frame(self.frame)
+                model.predict.assert_called_once_with(self.frame, imgsz=1280, verbose=False)
+                model.track.assert_not_called()
+
     def test_inference_requires_model(self):
         with self.assertRaisesRegex(ValueError, "Pass model weights"):
             Visualizer().process_frame(self.frame)

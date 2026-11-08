@@ -40,6 +40,17 @@ class VisualizerTests(unittest.TestCase):
                 self.assertTrue(np.any(expected != self.frame))
         np.testing.assert_array_equal(self.frame, 100)
 
+    def test_real_semantic_and_depth_results_render_through_direct_api(self):
+        semantic = np.zeros((96, 160), np.int32)
+        semantic[:, 80:] = 1
+        depth = np.linspace(1, 10, 96 * 160, dtype=np.float32).reshape(96, 160)
+        for result in (self.result(semantic_mask=semantic), self.result(depth=depth)):
+            with self.subTest(kind=type(result)):
+                output = Visualizer([result], save=False, show=False, timing=False)
+                self.assertEqual(output.shape, self.frame.shape)
+                self.assertTrue(np.any(output != self.frame))
+        np.testing.assert_array_equal(self.frame, 100)
+
     def test_detection_filtering_does_not_modify_input(self):
         boxes = np.array([[10, 10, 50, 70, 9, .9, 0],
                           [80, 10, 140, 70, 10, .8, 1]], dtype=np.float32)
