@@ -20,36 +20,28 @@ example paths below with your own.
 ## Visualize an image
 
 ```python
-import cv2
 from ultralytics import YOLO
 from ultraviz import Visualizer
 
 model = YOLO("model.pt")
 results = model.predict(source="path/to/image.jpg", retina_masks=True)
 output = Visualizer(results)
-if not cv2.imwrite("annotated.jpg", output):
-    raise OSError("Could not save annotated.jpg")
 ```
 
 Both `from ultraviz import Visualizer` and `from ultiviz import Visualizer`
 work; the distribution and command-line name remain `ultiviz`.
-`cv2.imwrite` needs an output filename and the annotated image.
+This call saves `annotated.jpg`, displays it, and returns the annotated BGR
+image array. Press any key to close the image preview.
 
 Use detection weights for bounding boxes, segmentation weights for masks, pose
 weights for skeletons, or OBB weights for rotated boxes. The renderer selects the
 right visualization automatically. `retina_masks=True` keeps instance masks at
 the original image resolution. Drawing preserves the input image by default.
 
-| Input to `Visualizer(...)` | Output |
-| --- | --- |
-| A single Results object | One BGR image array |
-| A one-item prediction list or tuple | One BGR image array |
-| Multiple predictions in a list or tuple | A list of BGR image arrays in input order |
-| A prediction iterator (`stream=True`) | A lazy iterator of annotated BGR image arrays |
-
-The return types are the same for image and video predictions. Empty lists
-raise `ValueError`; empty streams yield no frames. Every returned frame is a
-BGR image array ready for OpenCV. Nothing is saved automatically.
+`Visualizer(results)` saves and displays predictions immediately. The same call
+works with image and video sources; no frame loop, `cv2.imwrite`, or video writer
+is needed in your code. Existing output files with the selected names are
+replaced; input files are protected from being overwritten.
 
 ## Visualize a video stream
 
@@ -62,28 +54,30 @@ results = model.predict(source="path/to/video.mp4", stream=True, retina_masks=Tr
 output = Visualizer(results)
 ```
 
-The call returns annotated frames, using the same `Visualizer(results)` API
-as the image example. With `stream=True`, `output` is a lazy iterator: each frame
-is rendered when consumed, without loading the entire video into memory or
-repeating inference. With a prediction list, the output is a list of annotated
-frames (or one image for a one-item list).
+The call consumes the prediction stream immediately, saves `annotated.mp4`,
+and displays the video. `output` is the last annotated frame as a BGR image
+array, matching the image return format. The saved file contains all processed
+frames without audio. Press Q or Escape to stop early; the partial video is
+finalized and resources are released.
 
-Each video frame has the same BGR array format as an annotated image. For
-example, save the next frame with `cv2.imwrite("frame.jpg", next(output))`.
-Exhaust or close `output` when finished to release the prediction stream.
-Creating the iterator alone does not process the video.
+Frames are processed one at a time without repeating inference or storing the
+whole video in memory. Video prediction lists also work; `stream=True` is
+recommended for long videos. Source FPS is read from local video metadata or
+falls back to 30 FPS.
 
-If you also want to save the whole video in one call, opt in explicitly with a
-fresh prediction stream:
+Optional settings use the same call:
 
 ```python
-results = model.predict(source="path/to/video.mp4", stream=True, retina_masks=True)
-saved_path = Visualizer(results, save=True, output="annotated.mp4")
+output = Visualizer(results, output="custom.mp4", fps=25, show=False)
 ```
 
-The saving call returns the output `Path`, handles FPS and cleanup internally,
-and writes frames without audio. FPS comes from local video metadata or defaults
-to 30; use `fps=25` to override it.
+Use a fresh prediction stream for each call. `show=False` saves without opening
+a window and is required for servers, headless OpenCV, or environments without
+a desktop display. Use `save=False` to display without saving. Image output paths
+can use `.jpg`, `.png`, or another supported image extension; video output uses
+`.mp4`. The default image filename is `annotated.jpg`, and batch images use
+`annotated_2.jpg`, `annotated_3.jpg`, and so on. Image batches return a list of
+annotated arrays; streamed images return the last annotated image.
 
 For tracking trails, use tracked predictions:
 
@@ -135,10 +129,16 @@ Charts show current-frame counts or visible semantic-class pixel percentages.
 
 ## Keep visualization fast
 
-Call `Visualizer(results)` once for streamed predictions and consume the returned
-frames as needed. For your own frame loop, create `visualizer = Visualizer()`
-once and call `visualizer(result)` for each prediction. Both approaches reuse
-the renderer. Prefer `stream=True` for long videos to keep memory use bounded.
+`Visualizer(results)` immediately saves and displays the predictions. For a
+headless export, set `show=False` to skip preview work. Prefer `stream=True` for
+long videos to keep memory use bounded.
+
+For pure rendering without saving or display, use
+`Visualizer(results, save=False, show=False)`. This returns an annotated array
+for one prediction, a list for multiple predictions, or a lazy frame iterator
+for streamed input. Exhaust or close a lazy iterator to release its input.
+Alternatively, create `visualizer = Visualizer()` once and call
+`visualizer(result)` in your own processing loop.
 
 Use `Visualizer(results, copy=False)`, `visualizer(result, copy=False)`,
 or `process_frame(frame, copy=False)` to avoid copying the input image when you

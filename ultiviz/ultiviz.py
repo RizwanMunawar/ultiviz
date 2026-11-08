@@ -26,13 +26,16 @@ class _VisualizerType(type):
     def __call__(cls, model=None, **options):
         if _is_result(model) or isinstance(model, (list, tuple, Iterator)):
             copy = options.pop("copy", True)
-            if options.pop("save", False):
-                output = options.pop("output", "annotated.mp4")
-                fps = options.pop("fps", None)
-                renderer = super().__call__(**options)
-                results = [model] if _is_result(model) else model
-                return renderer.save_stream(results, output, fps=fps, copy=copy)
+            save = options.pop("save", True)
+            show = options.pop("show", True)
+            output = options.pop("output", None)
+            fps = options.pop("fps", None)
             renderer = super().__call__(**options)
+            if save or show:
+                return renderer.present(model, output=output, save=save, show=show,
+                                        fps=fps, copy=copy)
+            if output is not None or fps is not None:
+                raise ValueError("output and fps require saving or display")
             return renderer(model, copy=copy)
         return super().__call__(model, **options)
 
@@ -44,10 +47,10 @@ class Visualizer(
     """Render detection, segmentation, pose, OBB, classification and tracks.
 
     Visualizer(results) directly renders a prediction or prediction list;
-    a single result returns an image, multiple results return a list of images,
-    and an iterator returns a lazy iterator of images, for images and videos
-    alike. Saving requires save=True. For repeated calls, create Visualizer()
-    once and call it with each result.
+    annotations are saved and displayed immediately. Images return annotated
+    arrays; videos return the last annotated frame while saving the full video.
+    Use show=False for headless export, or save=False, show=False for pure
+    rendering (lazy for iterators). Create Visualizer() for reusable rendering.
 
     The model is optional. Use annotate() with an existing Ultralytics Results
     object, or pass model weights/a model object for process_frame() and run().

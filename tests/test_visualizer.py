@@ -36,7 +36,7 @@ class VisualizerTests(unittest.TestCase):
         for result in predictions:
             with self.subTest(result=result):
                 expected = Visualizer().annotate(result)
-                np.testing.assert_array_equal(Visualizer([result]), expected)
+                np.testing.assert_array_equal(Visualizer([result], save=False, show=False), expected)
                 self.assertTrue(np.any(expected != self.frame))
         np.testing.assert_array_equal(self.frame, 100)
 
