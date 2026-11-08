@@ -2,7 +2,7 @@
 
 Visualize **Ultralytics YOLO results** with one call: bounding boxes, instance and
 semantic masks, pose skeletons, oriented boxes, depth heatmaps, and tracking
-trails. `Visualizer(results)` saves and displays annotations automatically.
+trails. `Visualizer(results)` automatically saves and displays annotations.
 
 [Explore YOLO26 models](https://docs.ultralytics.com/models/yolo26/) ·
 [Learn the Ultralytics prediction API](https://docs.ultralytics.com/modes/predict/)
@@ -16,7 +16,7 @@ python3 -m pip install -e ".[ultralytics]"
 ```
 
 Both `from ultraviz import Visualizer` and `from ultiviz import Visualizer` work.
-Replace the example source paths with your files. Ultralytics downloads model
+Replace the example source paths with your own file paths. Ultralytics downloads model
 weights on first use. Semantic and depth examples need a recent Ultralytics
 version supporting those tasks; rendering is tested with 8.4.190.
 
@@ -196,4 +196,4 @@ python3 -m ultiviz --help
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`).
+[GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0`).
