@@ -2,7 +2,7 @@
 
 import argparse
 
-from .visualizer import Visualizer
+from .ultiviz import Visualizer
 
 
 def main(argv=None, *, visualizer_class=Visualizer):

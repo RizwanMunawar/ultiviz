@@ -1,4 +1,4 @@
-"""Public Visualizer API and automatic result dispatch."""
+"""Ultralytics visualization utilities and automatic result dispatch."""
 
 from pathlib import Path
 
@@ -121,8 +121,3 @@ class Visualizer(
             self.draw_chart(annotated, counts, names)
         return annotated
 
-    @classmethod
-    def main(cls):
-        """Run the CLI (retained for compatibility with the single-file API)."""
-        from .cli import main
-        return main(visualizer_class=cls)
