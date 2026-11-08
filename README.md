@@ -19,7 +19,7 @@ example paths below with your own.
 
 ## Task examples
 
-All seven examples use the same `output = Visualizer(results)` call. Images are
+All examples use the same `output = Visualizer(results)` call. Images are
 saved to `annotated.jpg`; videos are saved to `annotated.mp4`. Both are displayed
 automatically, and per-frame inference/visualization times are reported.
 Image previews close on any key; video previews stop on Q or Escape. Use
@@ -95,6 +95,30 @@ model = YOLO("yolo26n-depth.pt")
 results = model.predict(source="path/to/image.jpg")
 output = Visualizer(results)
 ```
+
+### Video inference
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n.pt")
+results = model.predict(source="path/to/video.mp4", stream=True, retina_masks=True)
+output = Visualizer(results)
+```
+
+This call processes the video immediately, saves `annotated.mp4`, displays the
+annotations, and reports inference and visualization time for each frame.
+No frame loop or video writer is needed. Press Q or Escape to stop playback;
+`output` is the last annotated BGR frame, and the saved video contains all
+processed frames without audio.
+
+The same video pattern works for instance segmentation, pose, OBB, semantic
+segmentation, and depth: replace `yolo26n.pt` with the corresponding weights from
+the examples above. Keep `retina_masks=True` for full-resolution instance masks.
+`stream=True` processes one frame at a time instead of loading the whole video
+into memory. For headless use, call `Visualizer(results, show=False)` to save
+without opening a preview window.
 
 ### Tracking
 
