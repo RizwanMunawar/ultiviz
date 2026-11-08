@@ -24,7 +24,7 @@ class SaveStreamTests(unittest.TestCase):
     def result(self, **kwargs):
         return SimpleNamespace(orig_img=self.frame, names={0: "object"}, **kwargs)
 
-    def test_default_call_saves_playable_video_with_source_fps(self):
+    def test_explicit_save_produces_playable_video_with_source_fps(self):
         source = self.directory / "source.mp4"
         writer = cv2.VideoWriter(str(source), cv2.VideoWriter_fourcc(*"mp4v"), 12, (64, 48))
         self.assertTrue(writer.isOpened())
@@ -41,7 +41,7 @@ class SaveStreamTests(unittest.TestCase):
         previous = Path.cwd()
         try:
             os.chdir(self.directory)
-            output = Visualizer(results(), show_chart=True)
+            output = Visualizer(results(), save=True, show_chart=True)
             self.assertEqual(output, Path("annotated.mp4"))
             capture = cv2.VideoCapture(str(output))
             try:
@@ -74,7 +74,7 @@ class SaveStreamTests(unittest.TestCase):
             self.assertEqual(writer.write.call_count, 2)
         output = self.directory / "nested folder" / "custom.mp4"
         with patch("ultiviz.video.cv2.VideoWriter", return_value=writer) as factory:
-            actual = Visualizer(results(), output=output, fps=24)
+            actual = Visualizer(results(), save=True, output=output, fps=24)
         self.assertEqual(actual, output)
         self.assertEqual(factory.call_args.args[2:], (24, (64, 48)))
         self.assertTrue(output.parent.is_dir())
@@ -87,25 +87,36 @@ class SaveStreamTests(unittest.TestCase):
             writer.reset_mock()
             results = [self.result(path="source.mp4") for _ in range(count)]
             with patch("ultiviz.video.cv2.VideoWriter", return_value=writer):
-                output = Visualizer(results, output=self.output)
+                output = Visualizer(results, save=True, output=self.output)
             self.assertEqual(output, self.output)
             self.assertEqual(writer.write.call_count, count)
             writer.release.assert_called_once()
 
-    def test_video_batch_can_opt_out_of_saving(self):
-        with patch("ultiviz.video.cv2.VideoWriter") as writer:
-            outputs = Visualizer([self.result(path="source.mp4")], save=False)
-            self.assertIs(iter(outputs), outputs)
-            np.testing.assert_array_equal(next(outputs), self.frame)
-            with self.assertRaises(StopIteration):
-                next(outputs)
-        writer.assert_not_called()
+    def test_video_lists_and_streams_return_frames_without_saving(self):
+        for count in (1, 3):
+            results = [self.result(path="source.mp4") for _ in range(count)]
+            expected = [Visualizer().annotate(result) for result in results]
+            with patch("ultiviz.video.cv2.VideoWriter") as writer:
+                output = Visualizer(results)
+                if count == 1:
+                    self.assertIsInstance(output, np.ndarray)
+                    np.testing.assert_array_equal(output, expected[0])
+                else:
+                    self.assertIsInstance(output, list)
+                    for actual, image in zip(output, expected):
+                        np.testing.assert_array_equal(actual, image)
+                frames = Visualizer(iter(results))
+                self.assertIs(iter(frames), frames)
+                for actual, image in zip(frames, expected):
+                    self.assertIsInstance(actual, np.ndarray)
+                    np.testing.assert_array_equal(actual, image)
+            writer.assert_not_called()
 
     def test_unknown_source_fps_defaults_to_30(self):
         writer = Mock()
         writer.isOpened.return_value = True
         with patch("ultiviz.video.cv2.VideoWriter", return_value=writer) as factory:
-            Visualizer(iter([self.result(path="camera")]), output=self.output)
+            Visualizer(iter([self.result(path="camera")]), save=True, output=self.output)
         self.assertEqual(factory.call_args.args[2], 30)
 
     def test_invalid_source_fps_releases_metadata_capture(self):
@@ -121,20 +132,20 @@ class SaveStreamTests(unittest.TestCase):
     def test_empty_stream_does_not_open_writer(self):
         with patch("ultiviz.video.cv2.VideoWriter") as factory:
             with self.assertRaisesRegex(ValueError, "No prediction results"):
-                Visualizer(iter([]), output=self.output)
+                Visualizer(iter([]), save=True, output=self.output)
         factory.assert_not_called()
 
     def test_source_output_collision_does_not_open_writer(self):
         with patch("ultiviz.video.cv2.VideoWriter") as factory:
             with self.assertRaisesRegex(ValueError, "Output must differ"):
-                Visualizer(iter([self.result(path=str(self.output))]), output=self.output)
+                Visualizer(iter([self.result(path=str(self.output))]), save=True, output=self.output)
         factory.assert_not_called()
 
     def test_invalid_output_settings_close_iterator(self):
         for options in ({"fps": 0}, {"fps": float("nan")}, {"output": "output.avi"}):
             iterator = Mock(__iter__=lambda self: self, __next__=Mock(side_effect=StopIteration))
             with self.assertRaises(ValueError):
-                Visualizer(iterator, **options)
+                Visualizer(iterator, save=True, **options)
             iterator.close.assert_called_once()
 
     def test_failures_release_writer_and_prediction_generator(self):
@@ -156,7 +167,7 @@ class SaveStreamTests(unittest.TestCase):
             with self.subTest(failure=failure), \
                     patch("ultiviz.video.cv2.VideoWriter", return_value=writer):
                 with self.assertRaises((ValueError, RuntimeError)):
-                    Visualizer(results(), output=self.output)
+                    Visualizer(results(), save=True, output=self.output)
             writer.release.assert_called_once()
             self.assertEqual(closed, [True])
 

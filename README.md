@@ -43,12 +43,13 @@ the original image resolution. Drawing preserves the input image by default.
 | Input to `Visualizer(...)` | Output |
 | --- | --- |
 | A single Results object | One BGR image array |
-| A one-item image prediction list or tuple | One BGR image array |
-| Multiple image predictions in a list or tuple | A list of BGR image arrays in input order |
-| A video prediction list or prediction iterator (`stream=True`) | Saves `annotated.mp4` and returns its `Path` |
+| A one-item prediction list or tuple | One BGR image array |
+| Multiple predictions in a list or tuple | A list of BGR image arrays in input order |
+| A prediction iterator (`stream=True`) | A lazy iterator of annotated BGR image arrays |
 
-Empty lists and streams raise `ValueError`. For multiple images, save each returned image separately. Model paths and model objects still
-create a reusable visualizer for inference, as shown below.
+The return types are the same for image and video predictions. Empty lists
+raise `ValueError`; empty streams yield no frames. Every returned frame is a
+BGR image array ready for OpenCV. Nothing is saved automatically.
 
 ## Visualize a video stream
 
@@ -61,23 +62,28 @@ results = model.predict(source="path/to/video.mp4", stream=True, retina_masks=Tr
 output = Visualizer(results)
 ```
 
-The call renders and saves `annotated.mp4` in your working directory
-and returns its `Path`. No frame loop, capture, or video writer is needed in your
-code. Frames are processed one at a time, with no extra model inference. The
-writer and prediction stream are closed automatically, including on failure.
-Video prediction lists also work, but `stream=True` keeps memory use bounded.
-The output contains video frames without audio.
+The call returns annotated frames, using the same `Visualizer(results)` API
+as the image example. With `stream=True`, `output` is a lazy iterator: each frame
+is rendered when consumed, without loading the entire video into memory or
+repeating inference. With a prediction list, the output is a list of annotated
+frames (or one image for a one-item list).
 
-Optional output path and FPS overrides use the same call:
+Each video frame has the same BGR array format as an annotated image. For
+example, save the next frame with `cv2.imwrite("frame.jpg", next(output))`.
+Exhaust or close `output` when finished to release the prediction stream.
+Creating the iterator alone does not process the video.
+
+If you also want to save the whole video in one call, opt in explicitly with a
+fresh prediction stream:
 
 ```python
-output = Visualizer(results, output="output/video.mp4", fps=25)
+results = model.predict(source="path/to/video.mp4", stream=True, retina_masks=True)
+saved_path = Visualizer(results, save=True, output="annotated.mp4")
 ```
 
-Use a fresh prediction stream for each call. By default, FPS comes from the
-first result's local video file; unavailable metadata, URLs, and camera sources
-use 30 FPS. Use `fps=` when another rate is needed. Empty streams and changing
-frame dimensions raise clear errors. Output must differ from the input video.
+The saving call returns the output `Path`, handles FPS and cleanup internally,
+and writes frames without audio. FPS comes from local video metadata or defaults
+to 30; use `fps=25` to override it.
 
 For tracking trails, use tracked predictions:
 
@@ -129,12 +135,10 @@ Charts show current-frame counts or visible semantic-class pixel percentages.
 
 ## Keep visualization fast
 
-Call `Visualizer(results)` once for video predictions; it writes frames as they
-arrive without collecting the video in memory. To integrate with your own frame
-loop, create `visualizer = Visualizer()` once and call `visualizer(result)` for
-each prediction. Advanced callers can use `Visualizer(results, save=False)` to
-get a lazy frame iterator instead of saving; exhaust or close that iterator to
-release the prediction stream.
+Call `Visualizer(results)` once for streamed predictions and consume the returned
+frames as needed. For your own frame loop, create `visualizer = Visualizer()`
+once and call `visualizer(result)` for each prediction. Both approaches reuse
+the renderer. Prefer `stream=True` for long videos to keep memory use bounded.
 
 Use `Visualizer(results, copy=False)`, `visualizer(result, copy=False)`,
 or `process_frame(frame, copy=False)` to avoid copying the input image when you
