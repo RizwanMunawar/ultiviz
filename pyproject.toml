@@ -26,6 +26,6 @@ dev = ["build>=1", "twine>=5", "ultralytics>=8.4"]
 ultiviz = "ultiviz.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
 include = ["ultiviz*"]
 

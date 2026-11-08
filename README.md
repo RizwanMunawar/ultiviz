@@ -5,7 +5,7 @@ segmentation masks, pose skeletons, oriented bounding boxes (OBB), classificatio
 labels, tracking trails, and class distribution charts with OpenCV.
 
 The public API is `from ultiviz import Visualizer`. All implementation modules
-live in `src/ultiviz/`. Run the CLI with `ultiviz` or `python -m ultiviz`.
+live in `ultiviz/`. Run the CLI with `ultiviz` or `python -m ultiviz`.
 
 ## Install locally
 
@@ -126,7 +126,7 @@ region, line, and label helpers.
 
 ```text
 pyproject.toml
-src/ultiviz/
+ultiviz/
     __init__.py       # Public API and version
     __main__.py       # python -m ultiviz
     visualizer.py     # Configuration and result dispatch
@@ -160,7 +160,8 @@ and a real MP4 encode/process/decode round trip. Path tests include spaces, and
 video files are explicitly removed after processing to catch leaked handles on
 Windows. Integration tests are skipped when Ultralytics is not installed.
 The build job validates the wheel and source distribution and tests the installed
-wheel separately.
+wheel separately. CI runs installed-package tests from a temporary working
+directory so the source checkout cannot shadow the installed package.
 
 Run the base suite after installing the package:
 
