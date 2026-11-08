@@ -30,9 +30,7 @@ pretrained weights on first use if they are not already available locally.
 Semantic segmentation and depth require an Ultralytics version supporting these
 YOLO26 tasks (examples verified with version 8.4.190).
 
-### 1. Object detection — `yolo26n.pt`
-
-Draw bounding boxes and class labels:
+### Object detection
 
 ```python
 from ultralytics import YOLO
@@ -43,10 +41,7 @@ results = model.predict(source="path/to/image.jpg")
 output = Visualizer(results)
 ```
 
-### 2. Instance segmentation — `yolo26n-seg.pt`
-
-Draw separate masks for individual objects. `retina_masks=True` keeps masks at
-the original image resolution:
+### Instance segmentation
 
 ```python
 from ultralytics import YOLO
@@ -57,11 +52,7 @@ results = model.predict(source="path/to/image.jpg", retina_masks=True)
 output = Visualizer(results)
 ```
 
-For masks without boxes, use `Visualizer(results, show_boxes=False)`.
-
-### 3. Pose estimation — `yolo26n-pose.pt`
-
-Draw person keypoints and skeletons:
+### Pose estimation
 
 ```python
 from ultralytics import YOLO
@@ -72,9 +63,7 @@ results = model.predict(source="path/to/image.jpg")
 output = Visualizer(results)
 ```
 
-### 4. Oriented bounding boxes — `yolo26n-obb.pt`
-
-Draw rotated boxes for objects such as those in aerial imagery:
+### Oriented bounding boxes (OBB)
 
 ```python
 from ultralytics import YOLO
@@ -85,9 +74,7 @@ results = model.predict(source="path/to/image.jpg")
 output = Visualizer(results)
 ```
 
-### 5. Semantic segmentation — `yolo26n-sem.pt`
-
-Color pixels by class using the predicted `semantic_mask`:
+### Semantic segmentation
 
 ```python
 from ultralytics import YOLO
@@ -98,9 +85,7 @@ results = model.predict(source="path/to/image.jpg")
 output = Visualizer(results)
 ```
 
-### 6. Depth estimation — `yolo26n-depth.pt`
-
-Blend a depth heatmap with the source image:
+### Depth estimation
 
 ```python
 from ultralytics import YOLO
@@ -111,15 +96,7 @@ results = model.predict(source="path/to/image.jpg")
 output = Visualizer(results)
 ```
 
-Colors are normalized separately for each frame and are for visualization, not
-cross-frame distance comparisons. Invalid depth pixels remain unchanged. Read
-`results[0].depth.data` for the model's original depth values. Use `show_depth=False`
-to hide the heatmap or `mask_opacity=1.0` for a fully colored map.
-
-### 7. Tracking and video streams — `yolo26n.pt`
-
-Track objects across frames, draw IDs and trails, save the video, and display
-playback without writing a frame loop:
+### Tracking
 
 ```python
 from ultralytics import YOLO
@@ -130,17 +107,22 @@ results = model.track(source="path/to/video.mp4", stream=True, tracker="bytetrac
 output = Visualizer(results, show_trails=True)
 ```
 
-For video inference without tracking, replace `model.track(...)` with
-`model.predict(source="path/to/video.mp4", stream=True)`. The same video pattern
-works with the task models above; only detection, instance segmentation, pose,
-and OBB support tracking.
-
 For model names and task details, see the official
 [YOLO26 overview](https://docs.ultralytics.com/models/yolo26/),
 [semantic segmentation guide](https://docs.ultralytics.com/tasks/semantic/), and
 [depth estimation guide](https://docs.ultralytics.com/tasks/depth/).
 
 ## Outputs and options
+
+For instance segmentation, `retina_masks=True` preserves full-resolution masks;
+use `show_boxes=False` to display masks alone. Depth colors are normalized per
+frame; use `results[0].depth.data` for original model values. Invalid depth pixels
+remain unchanged. `show_depth=False` hides depth, and `mask_opacity=1.0` displays
+a fully colored map.
+
+For video inference without tracking, use
+`model.predict(source="path/to/video.mp4", stream=True)`. Tracking works with
+detection, instance segmentation, pose, and OBB models.
 
 `output` is an annotated BGR image array for one image or the last processed
 frame for a video. The saved video contains all processed frames without audio.
