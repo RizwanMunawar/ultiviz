@@ -1,6 +1,7 @@
 """Ultralytics visualization utilities and automatic result dispatch."""
 
 from pathlib import Path
+from collections.abc import Iterator
 
 import numpy as np
 
@@ -15,11 +16,31 @@ from .tracking import TrackingMixin
 from .video import VideoMixin
 
 
+def _is_result(value):
+    return isinstance(getattr(value, "orig_img", None), np.ndarray)
+
+
+class _VisualizerType(type):
+    """Allow direct result rendering while retaining the configurable class API."""
+
+    def __call__(cls, model=None, **options):
+        if _is_result(model) or isinstance(model, (list, tuple, Iterator)):
+            copy = options.pop("copy", True)
+            renderer = super().__call__(**options)
+            return renderer(model, copy=copy)
+        return super().__call__(model, **options)
+
+
 class Visualizer(
     ColorMixin, DrawingMixin, DetectionMixin, SegmentationMixin, PoseMixin, ChartMixin,
-    TrackingMixin, InferenceMixin, VideoMixin,
+    TrackingMixin, InferenceMixin, VideoMixin, metaclass=_VisualizerType,
 ):
     """Render detection, segmentation, pose, OBB, classification and tracks.
+
+    Visualizer(results) directly renders a prediction or prediction list;
+    a single result returns an image, multiple results return a list of images,
+    and an iterator returns a lazy iterator of images. For repeated calls,
+    create Visualizer() once and call it with each result.
 
     The model is optional. Use annotate() with an existing Ultralytics Results
     object, or pass model weights/a model object for process_frame() and run().
@@ -113,9 +134,31 @@ class Visualizer(
                 or min(frame.shape[:2]) == 0):
             raise ValueError("Expected a nonempty uint8 BGR frame with shape (H, W, 3)")
 
-    def __call__(self, result, *, copy=True):
-        """Visualize one Ultralytics Results object using its original image."""
-        return self.annotate(result, copy=copy)
+    def __call__(self, results, *, copy=True):
+        """Render a result, a prediction list, or a lazy prediction iterator.
+
+        A singleton list returns one image; a longer list returns images in
+        order. Empty lists raise ValueError. Iterators stay lazy even when
+        they contain only one result, keeping video memory bounded.
+        """
+        if isinstance(results, (list, tuple)):
+            if not results:
+                raise ValueError("No prediction results to visualize")
+            if len(results) == 1:
+                return self.annotate(results[0], copy=copy)
+            return [self.annotate(result, copy=copy) for result in results]
+        if isinstance(results, Iterator):
+            return self._render_stream(results, copy=copy)
+        return self.annotate(results, copy=copy)
+
+    def _render_stream(self, results, *, copy):
+        try:
+            for result in results:
+                yield self.annotate(result, copy=copy)
+        finally:
+            close = getattr(results, "close", None)
+            if callable(close):
+                close()
 
     def annotate(self, frame, result=None, *, copy=True):
         """Auto-detect result type and return an annotated copy of a BGR frame.

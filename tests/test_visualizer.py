@@ -24,6 +24,22 @@ class VisualizerTests(unittest.TestCase):
     def result(self, **kwargs):
         return Results(self.frame, "test.jpg", self.names, **kwargs)
 
+    def test_direct_rendering_accepts_real_prediction_types(self):
+        boxes = np.array([[10, 10, 100, 90, .9, 0]], dtype=np.float32)
+        masks = np.zeros((1, 96, 160), dtype=np.float32)
+        masks[:, 20:80, 20:90] = 1
+        points = np.array([[[30, 30, .9], [70, 60, .9]]], dtype=np.float32)
+        obb = np.array([[80, 48, 50, 30, .5, .9, 0]], dtype=np.float32)
+        predictions = [self.result(boxes=boxes), self.result(boxes=boxes, masks=masks),
+                       self.result(boxes=boxes, keypoints=points), self.result(obb=obb),
+                       self.result(probs=np.array([.9, .1], dtype=np.float32))]
+        for result in predictions:
+            with self.subTest(result=result):
+                expected = Visualizer().annotate(result)
+                np.testing.assert_array_equal(Visualizer([result]), expected)
+                self.assertTrue(np.any(expected != self.frame))
+        np.testing.assert_array_equal(self.frame, 100)
+
     def test_detection_filtering_does_not_modify_input(self):
         boxes = np.array([[10, 10, 50, 70, 9, .9, 0],
                           [80, 10, 140, 70, 10, .8, 1]], dtype=np.float32)

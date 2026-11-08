@@ -22,19 +22,54 @@ example paths below with your own.
 ```python
 import cv2
 from ultralytics import YOLO
-from ultiviz import Visualizer
+from ultraviz import Visualizer
 
-result = YOLO("model.pt").predict("image.jpg", retina_masks=True)[0]
-visualizer = Visualizer()
-annotated = visualizer(result)
-cv2.imwrite("annotated.jpg", annotated)
+model = YOLO("model.pt")
+results = model.predict(source="path/to/image.jpg", retina_masks=True)
+output = Visualizer(results)
+if not cv2.imwrite("annotated.jpg", output):
+    raise OSError("Could not save annotated.jpg")
 ```
 
+Both `from ultraviz import Visualizer` and `from ultiviz import Visualizer`
+work; the distribution and command-line name remain `ultiviz`.
+`cv2.imwrite` needs an output filename and the annotated image.
+
 Use detection weights for bounding boxes, segmentation weights for masks, pose
-weights for skeletons, or OBB weights for rotated boxes. `visualizer(result)`
-selects the renderer automatically and returns an annotated copy, leaving the input intact.
-`visualizer.annotate(frame, result)` also works with an explicit image.
-`retina_masks=True` keeps instance masks at the original image resolution.
+weights for skeletons, or OBB weights for rotated boxes. The renderer selects the
+right visualization automatically. `retina_masks=True` keeps instance masks at
+the original image resolution. Drawing preserves the input image by default.
+
+| Input to `Visualizer(...)` | Output |
+| --- | --- |
+| A single Results object | One BGR image array |
+| A one-item prediction list or tuple | One BGR image array |
+| Multiple predictions in a list or tuple | A list of BGR image arrays in input order |
+| A prediction iterator (`stream=True`) | A lazy iterator of BGR image arrays |
+
+An empty list raises `ValueError`; an empty stream yields no frames. For multiple
+images, save each returned image separately. Model paths and model objects still
+create a reusable visualizer for inference, as shown below.
+
+## Visualize existing video predictions
+
+Use `stream=True` for videos so predictions and annotations are processed one
+frame at a time:
+
+```python
+results = model.predict(source="path/to/video.mp4", stream=True, retina_masks=True)
+outputs = Visualizer(results)
+try:
+    for output in outputs:
+        # Display output or write it with your cv2.VideoWriter here.
+        pass
+finally:
+    outputs.close()  # Also closes the prediction generator if you stop early.
+```
+
+Frames are rendered on demand through one shared renderer; inference is not
+repeated. A video contains multiple frames, so use `cv2.VideoWriter` to save a
+video or the one-call video API below.
 
 ## Visualize a video
 
@@ -65,7 +100,7 @@ visualizer = Visualizer(
     mask_opacity=0.5,
     class_colors={0: (0, 255, 0)},  # BGR colors
 )
-annotated = visualizer(result)
+annotated = visualizer(results)
 ```
 
 Other options include `show_labels`, `show_masks`, `show_pose`, `show_centers`,
@@ -102,11 +137,12 @@ pass each prediction directly without running inference twice:
 ```python
 visualizer = Visualizer()
 for result in model.predict("input.mp4", stream=True, retina_masks=True):
-    annotated = visualizer(result)
+    annotated = visualizer(results)
     # Display, save, or pass annotated to your application here.
 ```
 
-Use `visualizer(result, copy=False)` or `process_frame(frame, copy=False)` to
+Use `Visualizer(results, copy=False)`, `visualizer(result, copy=False)`,
+or `process_frame(frame, copy=False)` to
 avoid copying the input image when you can modify it in place. In-place drawing
 requires a writable, C-contiguous BGR image. The default preserves your input.
 Mask overlays retain cropped regions, and rounded geometry uses vectorized

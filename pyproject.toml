@@ -27,5 +27,5 @@ ultiviz = "ultiviz.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["ultiviz*"]
+include = ["ultiviz*", "ultraviz*"]
 
