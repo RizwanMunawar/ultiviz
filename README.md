@@ -4,9 +4,8 @@ A reusable Python package for drawing detection boxes, instance and semantic
 segmentation masks, pose skeletons, oriented bounding boxes (OBB), classification
 labels, tracking trails, and class distribution charts with OpenCV.
 
-The public API is `from ultiviz import Visualizer`. Rendering is organized
-into separate modules while preserving the constructor and drawing methods from
-the original single-file implementation.
+The public API is `from ultiviz import Visualizer`. All implementation modules
+live in `src/ultiviz/`. Run the CLI with `ultiviz` or `python -m ultiviz`.
 
 ## Install locally
 
@@ -85,13 +84,6 @@ The CLI requires explicit `--model` and `--source` arguments. Other options
 include `--chart`, `--hide-boxes`, `--hide-labels`, `--show-confidence`,
 `--classes 0 1`, `--conf 0.35`, `--imgsz 640`, and `--device cpu`.
 
-The original launcher still works from a source checkout without installing:
-
-```bash
-python3 codes/visualizer.py --model models/fruit-yolo26n-seg.pt \
-  --source videos/fruits.mp4 --chart --hide-boxes
-```
-
 ## Drawing and styling
 
 ```python
@@ -149,7 +141,6 @@ src/ultiviz/
     video.py          # Capture, writing, preview, cleanup
     cli.py            # Command-line argument handling
 tests/
-codes/visualizer.py   # Compatibility launcher
 ```
 
 Implementation mixins are internal; applications should import `Visualizer`
@@ -188,8 +179,8 @@ python3 -m twine check dist/*
 ```
 
 Builds produce a wheel and source distribution under `dist/`. Only the package,
-tests, and project metadata belong in these distributions; local model weights,
-videos, and the unrelated example scripts are excluded.
+tests, and project metadata belong in these distributions; local model weights
+and videos are excluded.
 
 ## Publishing
 
