@@ -60,7 +60,7 @@ class DirectRenderingTests(unittest.TestCase):
                     yield self.result
             finally:
                 events.append("closed")
-        outputs = Visualizer(predictions())
+        outputs = Visualizer(predictions(), save=False)
         self.assertEqual(events, [])
         np.testing.assert_array_equal(next(outputs), self.frame)
         self.assertEqual(events, [0])
@@ -74,14 +74,14 @@ class DirectRenderingTests(unittest.TestCase):
                 yield SimpleNamespace(orig_img=None, names={})
             finally:
                 closed.append(True)
-        outputs = Visualizer(predictions())
+        outputs = Visualizer(predictions(), save=False)
         with self.assertRaisesRegex(ValueError, "nonempty uint8 BGR"):
             next(outputs)
         self.assertEqual(closed, [True])
 
     def test_empty_and_single_result_iterators_always_return_iterators(self):
-        self.assertEqual(list(Visualizer(iter([]))), [])
-        outputs = Visualizer(iter([self.result]))
+        self.assertEqual(list(Visualizer(iter([]), save=False)), [])
+        outputs = Visualizer(iter([self.result]), save=False)
         self.assertIs(iter(outputs), outputs)
         np.testing.assert_array_equal(next(outputs), self.frame)
         with self.assertRaises(StopIteration):
@@ -98,7 +98,7 @@ class DirectRenderingTests(unittest.TestCase):
                 return 1
         results = (SimpleNamespace(orig_img=self.frame, names={0: "object"}, boxes=Boxes(x))
                    for x in (5, 25))
-        first, second = Visualizer(results, show_trails=True, show_boxes=False, show_labels=False)
+        first, second = Visualizer(results, save=False, show_trails=True, show_boxes=False, show_labels=False)
         np.testing.assert_array_equal(first, self.frame)
         self.assertTrue(np.any(second[20, 20] != self.frame[20, 20]))
 

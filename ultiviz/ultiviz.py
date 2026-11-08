@@ -20,12 +20,29 @@ def _is_result(value):
     return isinstance(getattr(value, "orig_img", None), np.ndarray)
 
 
+def _is_video_batch(value):
+    if not isinstance(value, (list, tuple)) or not value:
+        return False
+    path = getattr(value[0], "path", None)
+    return (isinstance(path, (str, Path)) and Path(path).suffix.lower() in
+            {".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v", ".mpg",
+             ".mpeg", ".wmv", ".ts", ".asf"})
+
+
 class _VisualizerType(type):
     """Allow direct result rendering while retaining the configurable class API."""
 
     def __call__(cls, model=None, **options):
         if _is_result(model) or isinstance(model, (list, tuple, Iterator)):
             copy = options.pop("copy", True)
+            if isinstance(model, Iterator) or _is_video_batch(model):
+                save = options.pop("save", True)
+                output = options.pop("output", "annotated.mp4")
+                fps = options.pop("fps", None)
+                renderer = super().__call__(**options)
+                if save:
+                    return renderer.save_stream(model, output, fps=fps, copy=copy)
+                return renderer(iter(model), copy=copy)
             renderer = super().__call__(**options)
             return renderer(model, copy=copy)
         return super().__call__(model, **options)
@@ -38,9 +55,10 @@ class Visualizer(
     """Render detection, segmentation, pose, OBB, classification and tracks.
 
     Visualizer(results) directly renders a prediction or prediction list;
-    a single result returns an image, multiple results return a list of images,
-    and an iterator returns a lazy iterator of images. For repeated calls,
-    create Visualizer() once and call it with each result.
+    a single result returns an image, image batches return a list of images,
+    and a video batch or iterator saves annotated.mp4 and returns its Path.
+    Use save=False for a lazy image iterator instead. For repeated calls, create Visualizer()
+    once and call it with each result.
 
     The model is optional. Use annotate() with an existing Ultralytics Results
     object, or pass model weights/a model object for process_frame() and run().

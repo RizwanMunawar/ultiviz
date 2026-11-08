@@ -9,6 +9,65 @@ import numpy as np
 class VideoMixin:
     """Internal implementation mixed into the public Visualizer API."""
 
+    @staticmethod
+    def _source_fps(source):
+        """Read local metadata once; cameras/URLs and unknown FPS use 30."""
+        if not isinstance(source, (str, Path)) or not Path(source).is_file():
+            return 30.0
+        capture = cv2.VideoCapture(str(source))
+        try:
+            fps = capture.get(cv2.CAP_PROP_FPS)
+            return float(fps) if np.isfinite(fps) and fps > 0 else 30.0
+        finally:
+            capture.release()
+
+    def save_stream(self, results, output="annotated.mp4", *, fps=None, copy=True):
+        """Render predictions into an MP4 without rerunning model inference.
+
+        Uses the first result's local source FPS when available, otherwise 30.
+        Only the current frame is retained. Returns the output Path and closes
+        the prediction iterator and writer on success or failure.
+        """
+        iterator = iter(results)
+        writer = None
+        self.reset()
+        try:
+            output_path = Path(output)
+            if output_path.suffix.lower() != ".mp4":
+                raise ValueError("Stream output must use an .mp4 extension")
+            if fps is not None and (not np.isfinite(fps) or fps <= 0):
+                raise ValueError("fps must be finite and positive")
+            for result in iterator:
+                source = getattr(result, "path", None)
+                protected = [path for path in (source, self._model_path)
+                             if isinstance(path, (str, Path))]
+                if any(output_path.resolve() == Path(path).resolve() for path in protected):
+                    raise ValueError("Output must differ from source and model paths")
+                frame = self.annotate(result, copy=copy)
+                size = (frame.shape[1], frame.shape[0])
+                if writer is None:
+                    frame_size = size
+                    rate = self._source_fps(source) if fps is None else fps
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    writer = cv2.VideoWriter(str(output_path), cv2.VideoWriter_fourcc(*"mp4v"),
+                                             rate, frame_size)
+                    if not writer.isOpened():
+                        raise RuntimeError(f"Cannot create output video: {output_path}")
+                elif size != frame_size:
+                    raise ValueError("Video frame dimensions changed during capture")
+                writer.write(frame)
+            if writer is None:
+                raise ValueError("No prediction results to visualize")
+        finally:
+            try:
+                if writer is not None:
+                    writer.release()
+            finally:
+                close = getattr(iterator, "close", None)
+                if callable(close):
+                    close()
+        return output_path
+
     def run(self, source, output="output-visualization.mp4", *, show_window=True, max_preview_width=1280):
         """Process a video/camera, save optional MP4 output, and preview until Q.
 
