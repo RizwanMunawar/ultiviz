@@ -51,27 +51,69 @@ An empty list raises `ValueError`; an empty stream yields no frames. For multipl
 images, save each returned image separately. Model paths and model objects still
 create a reusable visualizer for inference, as shown below.
 
-## Visualize existing video predictions
+## Visualize and save a video stream
 
-Use `stream=True` for videos so predictions and annotations are processed one
-frame at a time:
+This complete example reads the source FPS, renders predictions one frame at a
+time, and saves an annotated MP4. Replace the weights and source paths with your
+own. Use `stream=True` to avoid collecting the entire video in memory.
 
 ```python
-results = model.predict(source="path/to/video.mp4", stream=True, retina_masks=True)
+import math
+
+import cv2
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+source = "path/to/video.mp4"
+model = YOLO("model.pt")
+
+# Read metadata only; YOLO reads the frames for inference.
+capture = cv2.VideoCapture(source)
+try:
+    if not capture.isOpened():
+        raise OSError(f"Could not open {source}")
+    fps = capture.get(cv2.CAP_PROP_FPS)
+    if not math.isfinite(fps) or fps <= 0:
+        fps = 30.0
+finally:
+    capture.release()
+
+results = model.predict(source=source, stream=True, retina_masks=True)
 outputs = Visualizer(results)
+writer = None
 try:
     for output in outputs:
-        # Display output or write it with your cv2.VideoWriter here.
-        pass
+        frame_size = (output.shape[1], output.shape[0])  # width, height
+        if writer is None:
+            output_size = frame_size
+            writer = cv2.VideoWriter(
+                "annotated.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, output_size,
+            )
+            if not writer.isOpened():
+                raise OSError("Could not create annotated.mp4")
+        elif frame_size != output_size:
+            raise ValueError("Frame dimensions changed during the video")
+        writer.write(output)
+    if writer is None:
+        raise ValueError("The source produced no video frames")
 finally:
-    outputs.close()  # Also closes the prediction generator if you stop early.
+    if writer is not None:
+        writer.release()
+    outputs.close()  # Releases the prediction stream, including on early exit.
 ```
 
-Frames are rendered on demand through one shared renderer; inference is not
-repeated. A video contains multiple frames, so use `cv2.VideoWriter` to save a
-video or the one-call video API below.
+`Visualizer(results)` returns a lazy iterator for a prediction stream. It reuses
+one renderer and runs no additional inference. Output frames are BGR arrays
+ready for OpenCV. This example saves video frames without audio.
 
-## Visualize a video
+For tracked trails, replace the prediction and rendering lines with:
+
+```python
+results = model.track(source=source, stream=True, retina_masks=True, persist=True)
+outputs = Visualizer(results, show_trails=True)
+```
+
+## Visualize a video in one call
 
 ```python
 from ultiviz import Visualizer
@@ -131,20 +173,14 @@ Charts show current-frame counts or visible semantic-class pixel percentages.
 
 ## Keep visualization fast
 
-Create one `Visualizer` and reuse it across frames. For an existing YOLO loop,
-pass each prediction directly without running inference twice:
-
-```python
-visualizer = Visualizer()
-for result in model.predict("input.mp4", stream=True, retina_masks=True):
-    annotated = visualizer(results)
-    # Display, save, or pass annotated to your application here.
-```
+For streamed predictions, call `Visualizer(results)` once outside the frame
+loop, as shown above. For your own frame loop, create `visualizer = Visualizer()`
+once and call `visualizer(result)` for each prediction. Both approaches reuse
+the renderer and avoid repeating inference.
 
 Use `Visualizer(results, copy=False)`, `visualizer(result, copy=False)`,
-or `process_frame(frame, copy=False)` to
-avoid copying the input image when you can modify it in place. In-place drawing
-requires a writable, C-contiguous BGR image. The default preserves your input.
+or `process_frame(frame, copy=False)` to avoid copying the input image when you
+can modify it in place. In-place drawing requires a writable, C-contiguous BGR image. The default preserves your input.
 Mask overlays retain cropped regions, and rounded geometry uses vectorized
 calculations. Disable optional features such as charts and trails when unused.
 For `run()`, `show_window=False` avoids preview work. Model inference speed
