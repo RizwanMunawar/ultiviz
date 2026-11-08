@@ -3,10 +3,12 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cv-visualizer"
+name = "ultiviz"
 version = "0.1.0"
 description = "OpenCV visualization for detection, segmentation, pose, OBB, and tracking results"
 readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.23",
@@ -23,9 +25,9 @@ ultralytics = ["ultralytics>=8.4"]
 dev = ["build>=1", "twine>=5", "ultralytics>=8.4"]
 
 [project.scripts]
-cv-visualizer = "cv_visualizer.cli:main"
+ultiviz = "ultiviz.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
-include = ["cv_visualizer*"]
+where = ["."]
+include = ["ultiviz*", "ultraviz*"]
 

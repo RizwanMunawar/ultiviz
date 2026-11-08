@@ -3,6 +3,8 @@
 import cv2
 import numpy as np
 
+_CURVE_T = np.linspace(0, 1, 10)[None, :, None]
+
 
 class DrawingMixin:
     """Internal implementation mixed into the public Visualizer API."""
@@ -10,17 +12,21 @@ class DrawingMixin:
     @staticmethod
     def _rounded_polygon(polygon, radius):
         polygon = np.asarray(polygon, dtype=np.float64).reshape(-1, 2)
-        points = []
-        for i, corner in enumerate(polygon):
-            incoming, outgoing = polygon[i - 1] - corner, polygon[(i + 1) % len(polygon)] - corner
-            a, b = np.linalg.norm(incoming), np.linalg.norm(outgoing)
-            if min(a, b) < 1e-6 or radius <= 0:
-                points.append(corner)
-                continue
-            trim = min(radius, a / 2, b / 2)
-            start, end = corner + incoming * trim / a, corner + outgoing * trim / b
-            for t in np.linspace(0, 1, 10):
-                points.append((1 - t) ** 2 * start + 2 * (1 - t) * t * corner + t ** 2 * end)
+        if not np.isfinite(polygon).all() or len(polygon) < 3:
+            raise ValueError("Expected at least three finite polygon points")
+        if radius <= 0:
+            return np.rint(polygon).astype(np.int32).reshape(-1, 1, 2)
+        incoming = np.roll(polygon, 1, axis=0) - polygon
+        outgoing = np.roll(polygon, -1, axis=0) - polygon
+        a = np.linalg.norm(incoming, axis=1, keepdims=True)
+        b = np.linalg.norm(outgoing, axis=1, keepdims=True)
+        trim = np.minimum(radius, np.minimum(a, b) / 2)
+        trim[(a < 1e-6) | (b < 1e-6)] = 0
+        start = polygon + incoming * trim / np.maximum(a, 1e-6)
+        end = polygon + outgoing * trim / np.maximum(b, 1e-6)
+        t = _CURVE_T
+        points = ((1 - t) ** 2 * start[:, None]
+                  + 2 * (1 - t) * t * polygon[:, None] + t ** 2 * end[:, None])
         return np.rint(points).astype(np.int32).reshape(-1, 1, 2)
 
     def draw_label(self, frame, text, anchor, color, *, above=True):

@@ -3,11 +3,19 @@
 import unittest
 
 import numpy as np
-from ultralytics.engine.results import Results
+from types import SimpleNamespace
 
-from cv_visualizer import Visualizer
+try:
+    from ultralytics.engine.results import Results
+except ModuleNotFoundError as exc:
+    if exc.name != "ultralytics":
+        raise
+    Results = None
+
+from ultiviz import Visualizer
 
 
+@unittest.skipIf(Results is None, "Install ultiviz[ultralytics] for integration tests")
 class VisualizerTests(unittest.TestCase):
     def setUp(self):
         self.frame = np.full((96, 160, 3), 100, dtype=np.uint8)
@@ -15,6 +23,33 @@ class VisualizerTests(unittest.TestCase):
 
     def result(self, **kwargs):
         return Results(self.frame, "test.jpg", self.names, **kwargs)
+
+    def test_direct_rendering_accepts_real_prediction_types(self):
+        boxes = np.array([[10, 10, 100, 90, .9, 0]], dtype=np.float32)
+        masks = np.zeros((1, 96, 160), dtype=np.float32)
+        masks[:, 20:80, 20:90] = 1
+        points = np.array([[[30, 30, .9], [70, 60, .9]]], dtype=np.float32)
+        obb = np.array([[80, 48, 50, 30, .5, .9, 0]], dtype=np.float32)
+        predictions = [self.result(boxes=boxes), self.result(boxes=boxes, masks=masks),
+                       self.result(boxes=boxes, keypoints=points), self.result(obb=obb),
+                       self.result(probs=np.array([.9, .1], dtype=np.float32))]
+        for result in predictions:
+            with self.subTest(result=result):
+                expected = Visualizer().annotate(result)
+                np.testing.assert_array_equal(Visualizer([result], save=False, show=False), expected)
+                self.assertTrue(np.any(expected != self.frame))
+        np.testing.assert_array_equal(self.frame, 100)
+
+    def test_real_semantic_and_depth_results_render_through_direct_api(self):
+        semantic = np.zeros((96, 160), np.int32)
+        semantic[:, 80:] = 1
+        depth = np.linspace(1, 10, 96 * 160, dtype=np.float32).reshape(96, 160)
+        for result in (self.result(semantic_mask=semantic), self.result(depth=depth)):
+            with self.subTest(kind=type(result)):
+                output = Visualizer([result], save=False, show=False, timing=False)
+                self.assertEqual(output.shape, self.frame.shape)
+                self.assertTrue(np.any(output != self.frame))
+        np.testing.assert_array_equal(self.frame, 100)
 
     def test_detection_filtering_does_not_modify_input(self):
         boxes = np.array([[10, 10, 50, 70, 9, .9, 0],
@@ -49,7 +84,7 @@ class VisualizerTests(unittest.TestCase):
         class_map[:, 40:] = 1
         visualizer = Visualizer(boundary_thickness=0, mask_opacity=1,
                                 class_colors={1: (0, 200, 0)})
-        output = visualizer.annotate(self.frame, self.result(semantic_mask=class_map))
+        output = visualizer.annotate(self.frame, SimpleNamespace(names=self.names, semantic_mask=SimpleNamespace(data=class_map)))
         np.testing.assert_array_equal(output[:, :80], self.frame[:, :80])
         np.testing.assert_array_equal(output[40, 120], [0, 200, 0])
 

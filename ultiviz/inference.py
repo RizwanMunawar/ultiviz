@@ -1,6 +1,7 @@
 """Lazy optional Ultralytics inference and tracking integration."""
 
 from pathlib import Path
+from time import perf_counter
 
 
 class InferenceMixin:
@@ -17,13 +18,16 @@ class InferenceMixin:
                     raise
                 raise ImportError(
                     'YOLO inference requires the optional extra: '
-                    'pip install "cv-visualizer[ultralytics]"'
+                    'pip install "ultiviz[ultralytics]"'
                 ) from exc
             self.model = YOLO(str(self.model))
         return self.model
 
-    def process_frame(self, frame):
-        """Run inference/tracking and render one frame, retaining track history."""
+    def process_frame(self, frame, *, copy=True):
+        """Infer and render one BGR frame; copy=False allows in-place drawing."""
+        self._validate_frame(frame)
+        if not copy and (not frame.flags.writeable or not frame.flags.c_contiguous):
+            raise ValueError("copy=False requires a writable C-contiguous frame")
         model = self._load_model()
         task = model.task
         if self.tracking and task not in {"detect", "segment", "pose", "obb"}:
@@ -36,8 +40,10 @@ class InferenceMixin:
                           classes=None if self.class_ids is None else sorted(self.class_ids))
         if task == "segment":
             kwargs["retina_masks"] = True
+        start = perf_counter() if self.timing else None
         if self.tracking:
             result = model.track(frame, persist=True, tracker=self.tracker, **kwargs)[0]
         else:
             result = model.predict(frame, **kwargs)[0]
-        return self.annotate(frame, result)
+        model_call_ms = (perf_counter() - start) * 1000 if start is not None else None
+        return self._render_timed(frame, result, copy=copy, model_call_ms=model_call_ms)

@@ -14,6 +14,7 @@ class TrackingMixin:
         self._history = {}
         self._last_seen = {}
         self._frame_index = 0
+        self.last_timing = None
 
     def _advance_tracks(self):
         self._frame_index += 1

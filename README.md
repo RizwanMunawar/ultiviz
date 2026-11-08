@@ -1,186 +1,199 @@
-# cv-visualizer
+# ultiviz
 
-A reusable Python package for drawing detection boxes, instance and semantic
-segmentation masks, pose skeletons, oriented bounding boxes (OBB), classification
-labels, tracking trails, and class distribution charts with OpenCV.
+Visualize **Ultralytics YOLO results** with one call: bounding boxes, instance and
+semantic masks, pose skeletons, oriented boxes, depth heatmaps, and tracking
+trails. `Visualizer(results)` automatically saves and displays annotations.
 
-The public API is `from cv_visualizer import Visualizer`. Rendering is organized
-into separate modules while preserving the constructor and drawing methods from
-the original single-file implementation.
+[Explore YOLO26 models](https://docs.ultralytics.com/models/yolo26/) ·
+[Learn the Ultralytics prediction API](https://docs.ultralytics.com/modes/predict/)
 
-## Install locally
+## Install
 
-Requires Python 3.10 or newer. Run from this project's root:
-
-```bash
-python3 -m pip install -e .
-```
-
-For built-in YOLO inference and tracking:
+Requires Python 3.10 or newer. From the repository root:
 
 ```bash
 python3 -m pip install -e ".[ultralytics]"
 ```
 
-The base package needs only NumPy and OpenCV. Ultralytics is imported lazily
-when loading model weights; drawing helpers do not require it.
+Both `from ultraviz import Visualizer` and `from ultiviz import Visualizer` work.
+Replace the example source paths with your own file paths. Ultralytics downloads model
+weights on first use. Semantic and depth examples need a recent Ultralytics
+version supporting those tasks; rendering is tested with 8.4.190.
 
-## Annotate existing results
+## Examples
+
+Images save to `annotated.jpg`; videos save to `annotated.mp4`. Press any key to
+close an image preview, or Q/Escape to stop a video. Use `show=False` for headless
+export. Each call needs fresh predictions when using a stream.
+
+### Object detection
 
 ```python
 from ultralytics import YOLO
-from cv_visualizer import Visualizer
+from ultraviz import Visualizer
 
-model = YOLO("models/fruit-yolo26n-seg.pt")
-visualizer = Visualizer(show_chart=True, show_boxes=False)
-result = model.predict("image.jpg", retina_masks=True)[0]
-annotated = visualizer.annotate(result.orig_img, result)
+model = YOLO("yolo26n.pt")
+results = model.predict(source="path/to/image.jpg")
+output = Visualizer(results)
 ```
 
-`annotate()` detects the result type and returns a copy of the frame. Use weights
-for the appropriate task: detection, instance segmentation, semantic
-segmentation, pose, OBB, or classification. Semantic rendering requires an
-Ultralytics version/model exposing `result.semantic_mask` as a class-ID map.
-For instance masks, `retina_masks=True` preserves full-resolution masks and holes.
+[Explore object detection models and usage →](https://docs.ultralytics.com/tasks/detect/)
 
-## Run inference and video visualization
+### Instance segmentation
 
 ```python
-from cv_visualizer import Visualizer
+from ultralytics import YOLO
+from ultraviz import Visualizer
 
-visualizer = Visualizer(
-    "models/person-hg-yolo26n.pt",
-    tracking=True,
-    show_trails=True,
+model = YOLO("yolo26n-seg.pt")
+results = model.predict(source="path/to/image.jpg", retina_masks=True)
+output = Visualizer(results)
+```
+
+[Explore instance segmentation and mask results →](https://docs.ultralytics.com/tasks/segment/)
+
+### Pose estimation
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n-pose.pt")
+results = model.predict(source="path/to/image.jpg")
+output = Visualizer(results)
+```
+
+[Explore pose models and keypoint results →](https://docs.ultralytics.com/tasks/pose/)
+
+### Oriented bounding boxes (OBB)
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n-obb.pt")
+results = model.predict(source="path/to/image.jpg")
+output = Visualizer(results)
+```
+
+[Explore oriented bounding box detection →](https://docs.ultralytics.com/tasks/obb/)
+
+### Semantic segmentation
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n-sem.pt")
+results = model.predict(source="path/to/image.jpg")
+output = Visualizer(results)
+```
+
+[Explore semantic segmentation models →](https://docs.ultralytics.com/tasks/semantic/)
+
+### Depth estimation
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n-depth.pt")
+results = model.predict(source="path/to/image.jpg")
+output = Visualizer(results)
+```
+
+[Explore depth estimation and depth maps →](https://docs.ultralytics.com/tasks/depth/)
+
+### Video inference
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n.pt")
+results = model.predict(source="path/to/video.mp4", stream=True, retina_masks=True)
+output = Visualizer(results)
+```
+
+The same video pattern works with the segmentation, pose, OBB, semantic, and
+depth weights above. `stream=True` keeps memory use bounded; no frame loop or
+video writer is needed.
+
+[Explore video sources and prediction settings →](https://docs.ultralytics.com/modes/predict/)
+
+### Tracking
+
+```python
+from ultralytics import YOLO
+from ultraviz import Visualizer
+
+model = YOLO("yolo26n.pt")
+results = model.track(source="path/to/video.mp4", stream=True, tracker="bytetrack.yaml")
+output = Visualizer(results, show_trails=True)
+```
+
+[Explore trackers and tracking settings →](https://docs.ultralytics.com/modes/track/)
+
+## Output and styling
+
+`output` is an annotated BGR array for an image, or the last annotated frame for
+a video. The saved video contains all processed frames without audio. Image
+batches return a list of arrays and save numbered files. Existing output files
+with the selected names are replaced; input files are protected from overwrite.
+
+```python
+output = Visualizer(
+    results,
+    output="custom.mp4",  # Use .jpg or .png for images
+    show=False,          # Save without opening a preview window
     show_confidence=True,
-)
-visualizer.run(
-    "videos/construction-workers-demo.mov",
-    "output.mp4",
-    show_window=False,
+    mask_opacity=0.5,
 )
 ```
 
-Use `process_frame(frame)` for an existing video loop. `run()` supports video
-paths and integer camera indices; set `output=None` to disable saving. Paths are
-relative to your working directory. Models and videos are supplied by the caller
-and are excluded from package distributions.
+| Option | Use |
+| --- | --- |
+| `show=False` | Headless export |
+| `save=False` | Preview without saving |
+| `show_boxes=False` | Masks or poses without boxes |
+| `show_trails=True` | Trails for predictions from `model.track()` |
+| `class_colors={0: (0, 255, 0)}` | Custom BGR class colors |
+| `mask_opacity=1.0` | Fully colored masks or depth maps |
+| `timing=False` | Disable timing work and console reports |
+| `copy=False` | Draw in place on a writable, contiguous BGR frame |
 
-Tracking works with detection, instance segmentation, pose, and OBB. When calling
-`annotate()` directly, results must already contain tracker IDs for trails to
-appear. Call it once per frame, in order, and use `reset()` before switching
-sequences. `run()` resets visualization state and the model's trackers itself.
+Video FPS comes from local metadata or defaults to 30; use `fps=25` to override
+it. Depth colors are normalized per frame, so use `results[0].depth.data` for
+original depth values. Invalid depth pixels remain unchanged.
+
+For drawing only, `Visualizer(results, save=False, show=False)` returns arrays
+or a lazy iterator for streamed input; exhaust or close that iterator when done.
+You can also reuse `visualizer = Visualizer()` and call `visualizer(result)`.
+The base install (`pip install -e .`) needs only NumPy and OpenCV.
+
+## Per-frame speed
+
+Each rendered frame reports model inference and visualization time:
+
+```text
+Frame 1 | inference: 5.20 ms | visualization: 1.40 ms | processing: 6.60 ms
+```
+
+Example values only. Inference comes from `result.speed`; visualization measures
+copying and drawing. Their sum excludes preprocessing, postprocessing, saving,
+and preview. Unavailable inference time displays `n/a`.
+Use `on_timing=callback` for structured `FrameTiming` records instead of console
+reports; reusable visualizers expose the latest record as `last_timing`.
+
+[Learn about Ultralytics prediction results and speed metrics →](https://docs.ultralytics.com/modes/predict/#working-with-results)
 
 ## Command line
 
 ```bash
-cv-visualizer --model models/person-hg-yolo26n.pt \
-  --source videos/construction-workers-demo.mov \
-  --output output.mp4 --track --trails --headless
-
-python3 -m cv_visualizer --help
+ultiviz --model yolo26n.pt --source input.mp4 --output annotated.mp4 --headless
+python3 -m ultiviz --help
 ```
 
-The CLI requires explicit `--model` and `--source` arguments. Other options
-include `--chart`, `--hide-boxes`, `--hide-labels`, `--show-confidence`,
-`--classes 0 1`, `--conf 0.35`, `--imgsz 640`, and `--device cpu`.
+## License
 
-The original launcher still works from a source checkout without installing:
-
-```bash
-python3 codes/visualizer.py --model models/fruit-yolo26n-seg.pt \
-  --source videos/fruits.mp4 --chart --hide-boxes
-```
-
-## Drawing and styling
-
-```python
-from cv_visualizer import Visualizer
-
-visualizer = Visualizer(
-    class_colors={0: (255, 0, 0)},
-    hidden_classes={"background"},
-    hidden_track_ids={9},
-    mask_opacity=0.45,
-    line_width=2,
-    corner_radius=8,
-    skeleton=[(0, 1), (1, 2)],
-)
-```
-
-All colors are BGR. Custom skeleton edges use zero-based indices. COCO skeleton
-edges are automatic for 17-keypoint poses; other layouts draw points unless a
-skeleton is supplied. Keypoints below `keypoint_confidence` are omitted.
-
-Public drawing methods modify their frame in place and return it:
-
-| Method | Purpose |
-| --- | --- |
-| `draw_box(frame, xyxy, color, label=None)` | Rounded axis-aligned box |
-| `draw_obb(frame, polygon, color, label=None)` | Rounded oriented box |
-| `draw_label(frame, text, anchor, color, above=True)` | Rounded label (`above` is keyword-only) |
-| `draw_masks(frame, masks, colors)` | Full-resolution mask blending and boundaries |
-| `draw_pose(frame, keypoints, color)` | Points and skeleton edges |
-| `draw_region(frame, polygon, color, label=None, opacity=0.15)` | Zone overlay |
-| `draw_line(frame, start, end, color, label=None)` | Counting line and markers |
-| `draw_chart(frame, counts, names, semantic=False)` | Donut and class legend (`semantic` is keyword-only) |
-
-Charts show current-frame object counts, or pixel percentages among visible
-semantic classes. They do not accumulate unique tracks. Counting and proximity
-rules stay in the calling application; their results can be displayed with the
-region, line, and label helpers.
-
-## Package layout
-
-```text
-pyproject.toml
-src/cv_visualizer/
-    __init__.py       # Public API and version
-    __main__.py       # python -m cv_visualizer
-    visualizer.py     # Configuration and result dispatch
-    detections.py     # Detection, OBB, mask, and pose coordination
-    drawing.py        # Rounded geometry, labels, boxes, regions, lines
-    segmentation.py   # Mask compositing and semantic rendering
-    pose.py           # Skeletons and keypoints
-    charts.py         # Donut charts and legends
-    colors.py         # Palette and normalized class names
-    tracking.py       # Trail history and expiry
-    inference.py      # Optional YOLO integration
-    video.py          # Capture, writing, preview, cleanup
-    cli.py            # Command-line argument handling
-tests/
-codes/visualizer.py   # Compatibility launcher
-```
-
-Implementation mixins are internal; applications should import `Visualizer`
-from the package root.
-
-## Test and build
-
-```bash
-python3 -m pip install -e ".[dev]"
-python3 -m unittest discover -s tests -v
-python3 -m build
-python3 -m twine check dist/*
-```
-
-Builds produce a wheel and source distribution under `dist/`. Only the package,
-tests, and project metadata belong in these distributions; local model weights,
-videos, and the unrelated example scripts are excluded.
-
-## Publishing
-
-`cv-visualizer` is a working distribution name; availability on PyPI has not been
-checked. Before a public release, choose the final distribution name in
-`pyproject.toml`, add your author details and chosen license, and update both
-the project version and `cv_visualizer.__version__` together.
-
-To upload the reviewed distributions to TestPyPI, then PyPI:
-
-```bash
-python3 -m twine upload --repository testpypi dist/*
-python3 -m twine upload dist/*
-```
-
-These commands require your registry credentials. No upload is performed by
-building or installing the package.
+[GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0`).
