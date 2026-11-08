@@ -1,10 +1,10 @@
-# cv-visualizer
+# ultiviz
 
 A reusable Python package for drawing detection boxes, instance and semantic
 segmentation masks, pose skeletons, oriented bounding boxes (OBB), classification
 labels, tracking trails, and class distribution charts with OpenCV.
 
-The public API is `from cv_visualizer import Visualizer`. Rendering is organized
+The public API is `from ultiviz import Visualizer`. Rendering is organized
 into separate modules while preserving the constructor and drawing methods from
 the original single-file implementation.
 
@@ -29,7 +29,7 @@ when loading model weights; drawing helpers do not require it.
 
 ```python
 from ultralytics import YOLO
-from cv_visualizer import Visualizer
+from ultiviz import Visualizer
 
 model = YOLO("models/fruit-yolo26n-seg.pt")
 visualizer = Visualizer(show_chart=True, show_boxes=False)
@@ -46,7 +46,7 @@ For instance masks, `retina_masks=True` preserves full-resolution masks and hole
 ## Run inference and video visualization
 
 ```python
-from cv_visualizer import Visualizer
+from ultiviz import Visualizer
 
 visualizer = Visualizer(
     "models/person-hg-yolo26n.pt",
@@ -74,11 +74,11 @@ sequences. `run()` resets visualization state and the model's trackers itself.
 ## Command line
 
 ```bash
-cv-visualizer --model models/person-hg-yolo26n.pt \
+ultiviz --model models/person-hg-yolo26n.pt \
   --source videos/construction-workers-demo.mov \
   --output output.mp4 --track --trails --headless
 
-python3 -m cv_visualizer --help
+python3 -m ultiviz --help
 ```
 
 The CLI requires explicit `--model` and `--source` arguments. Other options
@@ -95,7 +95,7 @@ python3 codes/visualizer.py --model models/fruit-yolo26n-seg.pt \
 ## Drawing and styling
 
 ```python
-from cv_visualizer import Visualizer
+from ultiviz import Visualizer
 
 visualizer = Visualizer(
     class_colors={0: (255, 0, 0)},
@@ -134,9 +134,9 @@ region, line, and label helpers.
 
 ```text
 pyproject.toml
-src/cv_visualizer/
+src/ultiviz/
     __init__.py       # Public API and version
-    __main__.py       # python -m cv_visualizer
+    __main__.py       # python -m ultiviz
     visualizer.py     # Configuration and result dispatch
     detections.py     # Detection, OBB, mask, and pose coordination
     drawing.py        # Rounded geometry, labels, boxes, regions, lines
@@ -155,6 +155,29 @@ codes/visualizer.py   # Compatibility launcher
 Implementation mixins are internal; applications should import `Visualizer`
 from the package root.
 
+## Supported platforms and tests
+
+GitHub Actions runs the base package tests on macOS, Linux, and Windows with
+Python 3.10, 3.11, 3.12, and 3.13. Separate Python 3.12 jobs on each OS install
+Ultralytics and exercise rendering with real Results objects. Tests use synthetic
+frames, temporary video files, and model doubles; they do not download model
+weights, use a camera, or open GUI windows.
+
+Base tests cover inference dispatch, tracking arguments, camera/path handling,
+video resource cleanup on success and failure, FPS fallback, CLI entry points,
+and a real MP4 encode/process/decode round trip. Path tests include spaces, and
+video files are explicitly removed after processing to catch leaked handles on
+Windows. Integration tests are skipped when Ultralytics is not installed.
+The build job validates the wheel and source distribution and tests the installed
+wheel separately.
+
+Run the base suite after installing the package:
+
+```bash
+python3 -m pip install .
+python3 -m unittest discover -s tests -v
+```
+
 ## Test and build
 
 ```bash
@@ -170,10 +193,9 @@ videos, and the unrelated example scripts are excluded.
 
 ## Publishing
 
-`cv-visualizer` is a working distribution name; availability on PyPI has not been
-checked. Before a public release, choose the final distribution name in
-`pyproject.toml`, add your author details and chosen license, and update both
-the project version and `cv_visualizer.__version__` together.
+`ultiviz` is the distribution, import, and CLI name. PyPI name availability has
+not been checked. Before a public release, add your author details and chosen
+license, and update both the project version and `ultiviz.__version__` together.
 
 To upload the reviewed distributions to TestPyPI, then PyPI:
 

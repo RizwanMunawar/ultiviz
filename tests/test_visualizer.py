@@ -3,11 +3,19 @@
 import unittest
 
 import numpy as np
-from ultralytics.engine.results import Results
+from types import SimpleNamespace
 
-from cv_visualizer import Visualizer
+try:
+    from ultralytics.engine.results import Results
+except ModuleNotFoundError as exc:
+    if exc.name != "ultralytics":
+        raise
+    Results = None
+
+from ultiviz import Visualizer
 
 
+@unittest.skipIf(Results is None, "Install ultiviz[ultralytics] for integration tests")
 class VisualizerTests(unittest.TestCase):
     def setUp(self):
         self.frame = np.full((96, 160, 3), 100, dtype=np.uint8)
@@ -49,7 +57,7 @@ class VisualizerTests(unittest.TestCase):
         class_map[:, 40:] = 1
         visualizer = Visualizer(boundary_thickness=0, mask_opacity=1,
                                 class_colors={1: (0, 200, 0)})
-        output = visualizer.annotate(self.frame, self.result(semantic_mask=class_map))
+        output = visualizer.annotate(self.frame, SimpleNamespace(names=self.names, semantic_mask=SimpleNamespace(data=class_map)))
         np.testing.assert_array_equal(output[:, :80], self.frame[:, :80])
         np.testing.assert_array_equal(output[40, 120], [0, 200, 0])
 

@@ -17,7 +17,7 @@ class InferenceMixin:
                     raise
                 raise ImportError(
                     'YOLO inference requires the optional extra: '
-                    'pip install "cv-visualizer[ultralytics]"'
+                    'pip install "ultiviz[ultralytics]"'
                 ) from exc
             self.model = YOLO(str(self.model))
         return self.model

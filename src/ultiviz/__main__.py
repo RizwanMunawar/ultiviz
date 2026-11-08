@@ -1,4 +1,4 @@
-"""Run with python -m cv_visualizer."""
+"""Run with python -m ultiviz."""
 
 from .cli import main
 
