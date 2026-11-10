@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 import cv2
 import numpy as np
 
-from ultraviz import Visualizer
+from ultiviz import Visualizer
 
 
 class PresentTests(unittest.TestCase):
