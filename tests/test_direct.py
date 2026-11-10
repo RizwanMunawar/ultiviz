@@ -10,7 +10,6 @@ import cv2
 import numpy as np
 
 from ultiviz import Visualizer
-from ultraviz import Visualizer as AlternateVisualizer
 
 
 class DirectRenderingTests(unittest.TestCase):
@@ -18,15 +17,11 @@ class DirectRenderingTests(unittest.TestCase):
         self.frame = np.full((48, 64, 3), 100, dtype=np.uint8)
         self.result = SimpleNamespace(orig_img=self.frame, names={0: "object"})
 
-    def test_both_imports_expose_same_api(self):
-        self.assertIs(AlternateVisualizer, Visualizer)
-        self.assertIsInstance(AlternateVisualizer(), Visualizer)
-
     def test_result_and_singleton_predictions_return_image(self):
         expected = Visualizer(show_chart=True)(self.result)
         for results in (self.result, [self.result], (self.result,)):
             with self.subTest(kind=type(results)):
-                output = AlternateVisualizer(results, save=False, show=False, show_chart=True)
+                output = Visualizer(results, save=False, show=False, show_chart=True)
                 self.assertIsInstance(output, np.ndarray)
                 np.testing.assert_array_equal(output, expected)
                 self.assertIsNot(output, self.frame)

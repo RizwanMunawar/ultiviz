@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import numpy as np
-from ultraviz import FrameTiming, Visualizer
+from ultiviz import FrameTiming, Visualizer
 
 
 class TimingTests(unittest.TestCase):
